@@ -1,0 +1,52 @@
+default_language_version:
+  python: python3.9
+default_stages: ["commit", "push"]
+repos:
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.0.1
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=100"]
+      - id: debug-statements
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      # XXX enable when stable
+      #- id: no-commit-to-branch
+      #  args: ["--branch=master"]
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: ["--markdown-linebreak-ext=md"]
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.8.0
+    hooks:
+      - id: isort
+        name: isort (python)
+      - id: isort
+        name: isort (cython)
+        types: ["cython"]
+
+  - repo: https://github.com/ambv/black
+    rev: 21.5b1
+    hooks:
+      - id: black
+
+  - repo: https://github.com/flakehell/flakehell
+    rev: v.0.8.0
+    hooks:
+      - id: flakehell
+        language_version: python3
+        types: ["python"]
+
+  # Run mypy locally to reuse poetry dev environment
+  - repo: local
+    hooks:
+      - id: mypy
+        name: Run mypy
+        language: system
+        types: ["python"]
+        entry: poetry run mypy
+        require_serial: True
+        files: src/

@@ -1,0 +1,63 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+env:
+  POETRY_VERSION: 1.1.6
+
+jobs:
+  ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.6, 3.7, 3.8, 3.9]
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache Poetry
+        id: cache-poetry
+        uses: actions/cache@v2.1.5
+        with:
+          path: ~/.poetry
+          key: ${{ runner.os }}-poetry-${{ env.POETRY_VERSION }}-${{ matrix.python-version }}
+
+      - name: Install poetry
+        uses: abatilo/actions-poetry@v2.1.2
+        with:
+          poetry-version: ${{ env.POETRY_VERSION }}
+
+      - name: Cache Dependencies
+        id: cache-deps
+        uses: actions/cache@v2.1.5
+        with:
+          path: ${{ github.workspace }}/.venv
+          key: ${{ runner.os }}-poetry-${{ env.POETRY_VERSION }}-${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cache-deps.cache-hit != 'true'
+        run: |
+          poetry config virtualenvs.in-project true
+          poetry install --no-interaction -E anyio
+      - name: Cache pre-commit hooks
+        id: cache-pre-commit
+        uses: actions/cache@v2.1.5
+        with:
+          path: ~/.cache/pre-commit
+          key: ${{ runner.os }}-pre-commit-${{ matrix.python-version }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Install pre-commit hooks
+        if: steps.cache-pre-commit.cache-hit != 'true'
+        run: poetry run pre-commit install-hooks
+
+      - name: Run checks
+        run: poetry run pre-commit run -a
+
+      - name: Run tests
+        run: poetry run pytest -v

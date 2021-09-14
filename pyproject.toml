@@ -1,0 +1,87 @@
+[tool.poetry]
+name = "rpcx"
+version = "0.0.1"
+description = "Asynchronous RPC client/server with streaming support"
+authors = ["Jordan Speicher <jordan@jspeicher.com>"]
+license = "MIT"
+packages = [
+    { include = "rpcx", from = "src" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+anyio = "^3.3.1"
+msgpack = "^1.0.2"
+websockets = "^10.0"
+asyncstdlib = "3.9.2"
+
+[tool.poetry.dev-dependencies]
+msgpack-types = "^0.2.0"
+pytest = "^6.2.5"
+pre-commit = "^2.15.0"
+mypy = "^0.910"
+pytest-cov = "^2.12.1"
+trio = "^0.19.0"
+pytest-mock = "^3.6.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+python_version = "3.7"
+#strict = true
+show_column_numbers = true
+show_error_codes = true
+files = "src/**.py"
+
+[tool.black]
+line-length = 120
+target-version = ['py39']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.flakehell]
+format = "colored"
+show_source = true
+max_line_length = 120
+extended_default_ignore=[]  # https://github.com/flakehell/flakehell/issues/10
+
+[tool.flakehell.plugins]
+# Ignore redefinition of variable name in new scope
+pyflakes = ["+*", "-F823"]
+flake8-bandit = ["+*"]
+flake8-bugbear = ["+*"]
+flake8-builtins = ["+*"]
+flake8-comprehensions = ["+*"]
+flake8-darglint = ["+*"]
+flake8-docstrings = ["+*"]
+flake8-eradicate = ["+*"]
+flake8-mutable = ["+*"]
+flake8-pytest-style = ["+*"]
+flake8-spellcheck = ["+*"]
+
+[tool.flakehell.exceptions."**/__init__.py"]
+# Ignore unused imports in __init__.py files
+pyflakes = ["-F401"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=src --cov-report=term-missing --no-cov-on-fail"
