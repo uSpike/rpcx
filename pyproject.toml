@@ -86,4 +86,4 @@ pyflakes = ["-F401"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=src --cov-report=term-missing --no-cov-on-fail"
+addopts = "--cov=src --cov-report=term-missing --no-cov-on-fail --cov-fail-under=100"
