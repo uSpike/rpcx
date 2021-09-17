@@ -136,7 +136,7 @@ async def test_server_invalid_id(caplog):
 
 
 async def test_server_unhandled_message(caplog):
-    async def wait(stream: Stream):
+    async def wait():
         await anyio.sleep_forever()
 
     rpc = RPCManager()
@@ -154,6 +154,7 @@ async def test_server_unhandled_message(caplog):
         async with anyio.create_task_group() as tg:
             tg.start_soon(server.serve, True)
             await stream.send(message.message_to_bytes(msg1))
+            await anyio.wait_all_tasks_blocked()
             await stream.send(message.message_to_bytes(msg2))
             await anyio.wait_all_tasks_blocked()
             tg.cancel_scope.cancel()

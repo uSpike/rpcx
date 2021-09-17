@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import Any, Callable, Coroutine, Dict, Optional, Tuple, get_type_hints
 
 import anyio
+from anyio import TASK_STATUS_IGNORED
+from anyio.abc import TaskStatus
 
 LOG = logging.getLogger(__name__)
 
@@ -59,8 +61,6 @@ class Task:
     def __init__(self) -> None:
         self.cancel_scope = anyio.CancelScope()
         self.stream: Optional[Stream] = None
-        #: signals task is ready to receive data
-        self.ready = anyio.Event()
 
 
 class RPCManager:
@@ -94,10 +94,12 @@ class RPCManager:
         kwargs: Dict[str, Any],
         send_stream_chunk: Callable[[Any], Coroutine[None, None, None]],
         send_stream_end: Callable[[], Coroutine[None, None, None]],
+        task_status: TaskStatus = TASK_STATUS_IGNORED,
     ) -> Any:
         """
         Calls the method.
         """
+        task_status.started()
         method = self.methods.get(method_name)
         if method is None:
             raise ValueError(f"Invalid method: '{method_name}'")
@@ -116,8 +118,6 @@ class RPCManager:
                 if method.stream_arg is not None:
                     kwargs[method.stream_arg] = stream
 
-                task.ready.set()
-
                 LOG.debug("Dispatch: %s %s %s", method_name, args, kwargs)
                 result = await method.func(*args, **kwargs)
 
@@ -130,13 +130,11 @@ class RPCManager:
 
     async def dispatch_stream_chunk(self, request_id: int, value: Any) -> None:
         task = self.tasks[request_id]
-        await task.ready.wait()
         if task.stream is not None:
             await task.stream.stream_producer.send(value)
 
     async def dispatch_stream_end(self, request_id: int) -> None:
         task = self.tasks[request_id]
-        await task.ready.wait()
         if task.stream is not None:
             await task.stream.stream_producer.aclose()
 

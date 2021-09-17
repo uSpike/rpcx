@@ -3,7 +3,7 @@ from functools import partial
 from typing import Any, Callable, Coroutine
 
 import anyio
-from anyio.abc import AnyByteStream, TaskGroup
+from anyio.abc import AnyByteStream, TaskGroup, TaskStatus
 
 from .message import (
     Message,
@@ -23,7 +23,7 @@ from .rpc import RPCManager
 LOG = logging.getLogger(__name__)
 
 
-def start_soon_callback_error(
+async def task_group_start_callback_error(
     task_group: TaskGroup,
     on_exception: Callable[[Exception], None],
     task: Callable[..., Coroutine[None, None, None]],
@@ -34,13 +34,13 @@ def start_soon_callback_error(
     This is useful to prevent an exception raised by a task from poisining an entire task group.
     """
 
-    async def wrapper() -> None:
+    async def wrapper(task_status: TaskStatus) -> None:
         try:
-            await task(*args)
+            await task(*args, task_status=task_status)
         except Exception as exc:
             on_exception(exc)
 
-    task_group.start_soon(wrapper)
+    await task_group.start(wrapper)
 
 
 class RPCServer:
@@ -48,7 +48,7 @@ class RPCServer:
         self.stream = stream
         self.rpc = rpc
 
-    async def handle_request(self, request: Request) -> None:
+    async def handle_request(self, request: Request, task_status: TaskStatus) -> None:
         """
         Handle a request call.
         """
@@ -60,6 +60,7 @@ class RPCServer:
                 request.kwargs,
                 partial(self.send_stream_chunk, request.id),
                 partial(self.send_stream_end, request.id),
+                task_status,
             )
             await self.send_response(request.id, ResponseStatus.OK, result)
         except (TypeError, ValueError) as exc:
@@ -113,8 +114,9 @@ class RPCServer:
             async for data in self.stream:
                 try:
                     msg = message_from_bytes(data)
+                    LOG.debug("Receive %s", msg)
                     if isinstance(msg, Request):
-                        start_soon_callback_error(task_group, log_error, self.handle_request, msg)
+                        await task_group_start_callback_error(task_group, log_error, self.handle_request, msg)
                     else:
                         await self.handle_event(msg)
                 except anyio.get_cancelled_exc_class():  # pragma: nocover
