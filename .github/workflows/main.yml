@@ -44,7 +44,7 @@ jobs:
         if: steps.cache-deps.cache-hit != 'true'
         run: |
           poetry config virtualenvs.in-project true
-          poetry install --no-interaction -E anyio
+          poetry install --no-interaction
       - name: Cache pre-commit hooks
         id: cache-pre-commit
         uses: actions/cache@v2.1.5
