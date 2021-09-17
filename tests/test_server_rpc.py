@@ -1,6 +1,12 @@
 import logging
 import math
+import sys
 from contextlib import asynccontextmanager
+
+if sys.version_info >= (3, 8):
+    from unittest.mock import AsyncMock
+else:
+    from mock import AsyncMock
 
 import anyio
 import asyncstdlib as astd
@@ -368,7 +374,7 @@ async def test_websockets_stream(mocker):
 
     from rpcx.client import WebSocketsStream
 
-    stream = WebSocketsStream(mocker.AsyncMock())
+    stream = WebSocketsStream(AsyncMock())
 
     await stream.receive()
     stream.websocket.recv.assert_called_once()

@@ -1,9 +1,14 @@
 import inspect
 import logging
 import math
-from collections.abc import AsyncIterator
+import sys
 from dataclasses import dataclass
 from typing import Any, Callable, Coroutine, Dict, Optional, Tuple, get_type_hints
+
+if sys.version_info >= (3, 9):  # pragma: nocover
+    from collections.abc import AsyncIterator
+else:  # pragma: nocover
+    from typing import AsyncIterator
 
 import anyio
 from anyio import TASK_STATUS_IGNORED
