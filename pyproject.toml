@@ -9,7 +9,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.6"
 anyio = "^3.3.1"
 msgpack = "^1.0.2"
 websockets = "^10.0"
