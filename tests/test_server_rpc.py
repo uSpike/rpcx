@@ -71,7 +71,9 @@ async def test_manager_aclose():
         pass
 
     async with anyio.create_task_group() as task_group:
-        task_group.start_soon(rpc.dispatch_request, request, dummy_sender)
+        task_group.start_soon(
+            rpc.dispatch_request, request.id, request.method, request.args, request.kwargs, dummy_sender, dummy_sender
+        )
         await started.wait()
         await rpc.aclose()
         await cancelled.wait()

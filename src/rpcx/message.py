@@ -1,14 +1,12 @@
-from __future__ import annotations
-
 import enum
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Dict, Tuple
 
 from msgpack import packb, unpackb
 
 
 class MessageType(enum.IntEnum):
     REQUEST = 0  #: RPC request, client->server
-    RESPONSE = 1  #: RPC response, client->server.
+    RESPONSE = 1  #: RPC response, server->client
     REQUEST_STREAM_CHUNK = 2  #: Stream part, client->server
     RESPONSE_STREAM_CHUNK = 3  #: Stream part, server->client
     REQUEST_STREAM_END = 4  #: Stream has ended, client->server
@@ -23,7 +21,7 @@ class ResponseStatus(enum.IntEnum):
     INTERNAL = 3  #: Internal error
 
 
-def message_from_bytes(data: bytes) -> Message:
+def message_from_bytes(data: bytes) -> "Message":
     msg_data = unpackb(data, use_list=False)
     msg_type = msg_data[0]
     msg_args = msg_data[1:]
@@ -45,7 +43,7 @@ def message_from_bytes(data: bytes) -> Message:
         raise ValueError(f"Unknown message type: {msg_type}")
 
 
-def message_to_bytes(msg: Message) -> bytes:
+def message_to_bytes(msg: "Message") -> bytes:
     return packb(msg.astuple())
 
 
@@ -61,7 +59,7 @@ class Message:
     def __init__(self, id: int) -> None:
         self.id = id
 
-    def astuple(self) -> tuple:
+    def astuple(self) -> Tuple[Any, ...]:
         attr_names = ("type",) + self.__slots__
         return tuple(getattr(self, attr) for attr in attr_names)
 
@@ -82,7 +80,7 @@ class Request(Message):
 
     __slots__ = ("id", "method", "args", "kwargs")
 
-    def __init__(self, id: int, method: str, args: tuple, kwargs: dict[str, Any]) -> None:
+    def __init__(self, id: int, method: str, args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> None:
         super().__init__(id)
         self.method = method
         self.args = args

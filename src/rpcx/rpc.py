@@ -1,21 +1,17 @@
-from __future__ import annotations
-
 import inspect
 import logging
 import math
 from collections.abc import AsyncIterator
-from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Coroutine, Dict, Optional, get_type_hints
+from typing import Any, Callable, Coroutine, Dict, Optional, Tuple, get_type_hints
 
 import anyio
-
-from .message import Request, ResponseStreamChunk, ResponseStreamEnd
 
 LOG = logging.getLogger(__name__)
 
 
-class Stream(AbstractAsyncContextManager, AsyncIterator):
+@dataclass
+class Stream(AsyncIterator["Stream"]):
     """
     An async-iterable stream object connected with callbacks to send stream messages.
 
@@ -23,41 +19,15 @@ class Stream(AbstractAsyncContextManager, AsyncIterator):
 
         async def method_foo(stream: Stream):
             async for data in stream:
-                ...
+                await stream.send(data + 1)
     """
 
-    def __init__(self, request: Request, sender: Callable[..., Coroutine[None, None, None]]) -> None:
-        super().__init__()
+    send: Callable[[Any], Coroutine[None, None, None]]
+
+    def __post_init__(self) -> None:
         self.stream_producer, self.stream_consumer = anyio.create_memory_object_stream(math.inf)
-        self.request = request
-        self._sender = sender
-        self._sent_stream_chunk = False
 
-    @asynccontextmanager
-    async def _make_ctx(self) -> AsyncIterator[Stream]:
-        with self.stream_producer, self.stream_consumer:
-            try:
-                yield self
-            finally:
-                with anyio.CancelScope(shield=True):
-                    if self._sent_stream_chunk:
-                        await self._sender(ResponseStreamEnd(self.request.id))
-
-    async def __aenter__(self) -> Stream:
-        self._ctx = self._make_ctx()
-        return await self._ctx.__aenter__()
-
-    async def __aexit__(self, *args: Any) -> None:
-        await self._ctx.__aexit__(*args)
-
-    async def send(self, value: Any) -> None:
-        """
-        Send a stream chunk.
-        """
-        self._sent_stream_chunk = True
-        await self._sender(ResponseStreamChunk(self.request.id, value))
-
-    def __aiter__(self) -> Stream:
+    def __aiter__(self) -> "Stream":
         return self
 
     async def __anext__(self) -> Any:
@@ -113,48 +83,63 @@ class RPCManager:
         for task in self.tasks.values():
             task.cancel_scope.cancel()
 
-    def task_exists(self, task_id: int) -> bool:
-        return task_id in self.tasks
+    def task_exists(self, request_id: int) -> bool:
+        return request_id in self.tasks
 
     async def dispatch_request(
         self,
-        request: Request,
-        sender: Callable[..., Coroutine[None, None, None]],
+        request_id: int,
+        method_name: str,
+        args: Tuple[Any, ...],
+        kwargs: Dict[str, Any],
+        send_stream_chunk: Callable[[Any], Coroutine[None, None, None]],
+        send_stream_end: Callable[[], Coroutine[None, None, None]],
     ) -> Any:
         """
         Calls the method.
         """
-        method = self.methods.get(request.method)
+        method = self.methods.get(method_name)
         if method is None:
-            raise ValueError(f"Invalid method: '{request.method}'")
+            raise ValueError(f"Invalid method: '{method_name}'")
 
-        task = self.tasks[request.id] = Task()
+        did_send_chunk = anyio.Event()
+
+        async def send_stream_chunk_event(value: Any) -> None:
+            did_send_chunk.set()
+            await send_stream_chunk(value)
+
+        task = self.tasks[request_id] = Task()
+        stream = task.stream = Stream(send_stream_chunk_event)
+
         try:
-            with task.cancel_scope:
-                async with AsyncExitStack() as stack:
-                    if method.stream_arg is not None:
-                        task.stream = request.kwargs[method.stream_arg] = Stream(request, sender)
-                        await stack.enter_async_context(task.stream)
+            with task.cancel_scope, stream.stream_producer, stream.stream_consumer:
+                if method.stream_arg is not None:
+                    kwargs[method.stream_arg] = stream
 
-                    task.ready.set()
+                task.ready.set()
 
-                    LOG.debug("Dispatch: %s %s %s", request.method, request.args, request.kwargs)
-                    return await method.func(*request.args, **request.kwargs)
+                LOG.debug("Dispatch: %s %s %s", method_name, args, kwargs)
+                result = await method.func(*args, **kwargs)
+
+                if did_send_chunk.is_set():
+                    await send_stream_end()
+
+                return result
         finally:
-            del self.tasks[request.id]
+            del self.tasks[request_id]
 
-    async def dispatch_stream_chunk(self, task_id: int, value: Any) -> None:
-        task = self.tasks[task_id]
+    async def dispatch_stream_chunk(self, request_id: int, value: Any) -> None:
+        task = self.tasks[request_id]
         await task.ready.wait()
         if task.stream is not None:
             await task.stream.stream_producer.send(value)
 
-    async def dispatch_stream_end(self, task_id: int) -> None:
-        task = self.tasks[task_id]
+    async def dispatch_stream_end(self, request_id: int) -> None:
+        task = self.tasks[request_id]
         await task.ready.wait()
         if task.stream is not None:
             await task.stream.stream_producer.aclose()
 
-    def dispatch_cancel(self, task_id: int) -> None:
-        task = self.tasks[task_id]
+    def dispatch_cancel(self, request_id: int) -> None:
+        task = self.tasks[request_id]
         task.cancel_scope.cancel()

@@ -1,9 +1,5 @@
-"""
-
-"""
-from __future__ import annotations
-
 import logging
+from functools import partial
 from typing import Any, Callable, Coroutine
 
 import anyio
@@ -17,6 +13,8 @@ from .message import (
     RequestStreamEnd,
     Response,
     ResponseStatus,
+    ResponseStreamChunk,
+    ResponseStreamEnd,
     message_from_bytes,
     message_to_bytes,
 )
@@ -28,7 +26,7 @@ LOG = logging.getLogger(__name__)
 def start_soon_callback_error(
     task_group: TaskGroup,
     on_exception: Callable[[Exception], None],
-    task: Callable[..., Coroutine],
+    task: Callable[..., Coroutine[None, None, None]],
     *args: Any,
 ) -> None:
     """
@@ -55,7 +53,14 @@ class RPCServer:
         Handle a request call.
         """
         try:
-            result = await self.rpc.dispatch_request(request, self.send_msg)
+            result = await self.rpc.dispatch_request(
+                request.id,
+                request.method,
+                request.args,
+                request.kwargs,
+                partial(self.send_stream_chunk, request.id),
+                partial(self.send_stream_end, request.id),
+            )
             await self.send_response(request.id, ResponseStatus.OK, result)
         except (TypeError, ValueError) as exc:
             LOG.exception("Invalid request")
@@ -87,6 +92,12 @@ class RPCServer:
 
     async def send_response(self, request_id: int, status: ResponseStatus, value: Any) -> None:
         await self.send_msg(Response(request_id, status, value))
+
+    async def send_stream_chunk(self, request_id: int, value: Any) -> None:
+        await self.send_msg(ResponseStreamChunk(request_id, value))
+
+    async def send_stream_end(self, request_id: int) -> None:
+        await self.send_msg(ResponseStreamEnd(request_id))
 
     async def serve(self, raise_on_error: bool = False) -> None:
         """

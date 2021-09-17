@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import math
 from collections.abc import Awaitable
@@ -11,7 +9,7 @@ import anyio
 import asyncstdlib as astd
 from anyio.abc import AnyByteStream, ObjectStream
 from anyio.streams.memory import MemoryObjectReceiveStream
-from websockets.client import WebSocketClientProtocol
+from websockets.client import WebSocketClientProtocol  # type: ignore[attr-defined]
 from websockets.exceptions import ConnectionClosed
 
 from .message import (
@@ -93,7 +91,7 @@ class _RequestTask:
         # There may be many stream chunks, do not block on receiving them.
         self.stream_producer, self.stream_consumer = anyio.create_memory_object_stream(math.inf)
 
-    @astd.lru_cache(maxsize=1)
+    @astd.lru_cache(maxsize=1)  # type: ignore[misc]
     async def get_response(self) -> Any:
         with self.response_producer, self.response_consumer:
             response = await self.response_consumer.receive()
@@ -109,16 +107,16 @@ class _RequestTask:
 
 
 @dataclass
-class RequestStream(Awaitable, AsyncIterator):
+class RequestStream(Awaitable[Any], AsyncIterator["RequestStream"]):
     """
     Yielded from `RPCClient.request_stream()`
     """
 
-    _get_response: Callable[[], Coroutine]
+    _get_response: Callable[[], Coroutine[None, None, None]]
     _stream_consumer: MemoryObjectReceiveStream[Any]
-    send: Callable[[Any], Coroutine]
+    send: Callable[[Any], Coroutine[None, None, None]]
 
-    def __aiter__(self) -> RequestStream:
+    def __aiter__(self) -> "RequestStream":
         return self
 
     async def __anext__(self) -> Any:
@@ -155,7 +153,7 @@ class RPCClient:
         return self._next_id
 
     @asynccontextmanager
-    async def _make_ctx(self) -> AsyncIterator[RPCClient]:
+    async def _make_ctx(self) -> AsyncIterator["RPCClient"]:
         try:
             async with self.task_group:
                 self.task_group.start_soon(self.receive_loop)
@@ -164,7 +162,7 @@ class RPCClient:
         finally:
             self.tasks.clear()
 
-    async def __aenter__(self) -> RPCClient:
+    async def __aenter__(self) -> "RPCClient":
         self._ctx = self._make_ctx()
         return await self._ctx.__aenter__()
 
