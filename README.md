@@ -1,5 +1,7 @@
 # RPCx
 
+[![CI](https://github.com/uSpike/rpcx/actions/workflows/main.yml/badge.svg)](https://github.com/uSpike/rpcx/actions/workflows/main.yml)
+
 Asynchronous RPC server/client for Python 3.7+ with streaming support.
 
 - Async backend implemented by `anyio` providing support for `asyncio` and `trio`.
