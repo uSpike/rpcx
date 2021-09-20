@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rpcx"
-version = "0.0.1"
+version = "0.1.0"
 description = "Asynchronous RPC client/server with streaming support"
 authors = ["Jordan Speicher <jordan@jspeicher.com>"]
 license = "MIT"
