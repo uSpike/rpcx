@@ -17,20 +17,26 @@ from rpcx import RPCClient, RPCManager, RPCServer, Stream
 
 
 async def add(a: int, b: int) -> int:
+    """Add two numbers"""
     return a + b
 
 
 async def fibonacci(n: int, stream: Stream) -> None:
+    """Stream each number as computed in the Fibonacci sequence for a given starting number"""
     a, b = 0, 1
+
     for i in range(n):
         await stream.send(i)
         a, b = b, a + b
 
 
-async def sum(stream: Stream) -> None:
+async def sum(stream: Stream) -> int:
+    """Stream numbers from client and return the sum"""
     total = 0
+
     async for num in stream:
         total += num
+
     return total
 
 
