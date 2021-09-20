@@ -63,6 +63,12 @@ class Message:
         attr_names = ("type",) + self.__slots__
         return tuple(getattr(self, attr) for attr in attr_names)
 
+    def __eq__(self, other: object) -> bool:
+        try:
+            return all(getattr(other, attr) == getattr(self, attr) for attr in self.__slots__)
+        except AttributeError:
+            return False
+
     def __repr__(self) -> str:
         args = zip(self.__slots__, self.astuple()[1:])
         args_str = ", ".join(f"{name}={repr(val)}" for name, val in args)

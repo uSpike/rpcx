@@ -4,6 +4,14 @@ version = "0.0.1"
 description = "Asynchronous RPC client/server with streaming support"
 authors = ["Jordan Speicher <jordan@jspeicher.com>"]
 license = "MIT"
+repository = "https://github.com/uSpike/rpcx"
+readme = "README.md"
+classifiers = [
+    "Framework :: AsyncIO",
+    "Framework :: Trio",
+    "Development Status :: 4 - Beta",
+    "Topic :: Software Development :: Libraries",
+]
 packages = [
     { include = "rpcx", from = "src" },
 ]

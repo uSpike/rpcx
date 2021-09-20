@@ -71,3 +71,17 @@ async def main() -> None:
 
 anyio.run(main)
 ```
+
+# Development
+
+## Installation
+
+Run `poetry install` to install the project.
+
+## Execute tests
+
+Execute `poetry run tox` to run tests for all python environments.
+
+## Pre-commit hooks
+
+Execute `poetry run pre-commit run -a` to run all linters, formatters, and checks.

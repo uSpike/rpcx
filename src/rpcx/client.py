@@ -3,7 +3,7 @@ import math
 import sys
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Callable, Coroutine, Dict, Generator, Optional, cast
+from typing import Any, AsyncIterator, Callable, Coroutine, Dict, Generator, Optional
 
 if sys.version_info >= (3, 9):  # pragma: nocover
     from collections.abc import Awaitable
@@ -12,10 +12,8 @@ else:  # pragma: nocover
 
 import anyio
 import asyncstdlib as astd
-from anyio.abc import AnyByteStream, ObjectStream
+from anyio.abc import AnyByteStream
 from anyio.streams.memory import MemoryObjectReceiveStream
-from websockets.client import WebSocketClientProtocol  # type: ignore[attr-defined]
-from websockets.exceptions import ConnectionClosed
 
 from .message import (
     Message,
@@ -31,34 +29,6 @@ from .message import (
 )
 
 LOG = logging.getLogger(__name__)
-
-
-@dataclass
-class WebSocketsStream(ObjectStream[bytes]):
-    """
-    Wrapper for WebSocketClientProtocol to appear as an anyio ObjectStream.
-    """
-
-    websocket: WebSocketClientProtocol
-
-    async def receive(self) -> bytes:
-        try:
-            # assume we're always receiving binary frames
-            return cast(bytes, await self.websocket.recv())
-        except ConnectionClosed as exc:
-            raise anyio.EndOfStream() from exc
-
-    async def send(self, data: bytes) -> None:
-        try:
-            await self.websocket.send(data)
-        except ConnectionClosed as exc:
-            raise anyio.EndOfStream() from exc
-
-    async def aclose(self) -> None:  # pragma: nocover
-        raise NotImplementedError()
-
-    async def send_eof(self) -> None:  # pragma: nocover
-        raise NotImplementedError()
 
 
 class ClientError(Exception):
@@ -111,7 +81,7 @@ class _RequestTask:
                 raise RemoteError(response.value)
 
 
-@dataclass
+@dataclass(repr=False)
 class RequestStream(Awaitable[Any], AsyncIterator["RequestStream"]):
     """
     Yielded from `RPCClient.request_stream()`
@@ -127,6 +97,8 @@ class RequestStream(Awaitable[Any], AsyncIterator["RequestStream"]):
     async def __anext__(self) -> Any:
         try:
             return await self._stream_consumer.receive()
+        except anyio.get_cancelled_exc_class():
+            raise
         except anyio.EndOfStream:
             raise StopAsyncIteration()
 
@@ -135,9 +107,9 @@ class RequestStream(Awaitable[Any], AsyncIterator["RequestStream"]):
 
 
 class RPCClient:
-    def __init__(self, stream: AnyByteStream) -> None:
+    def __init__(self, stream: AnyByteStream, raise_on_error: bool = False) -> None:
         self.stream = stream
-        self.task_group = anyio.create_task_group()
+        self.raise_on_error = raise_on_error
         #: In-flight requests, key is request id
         self.tasks: Dict[int, _RequestTask] = {}
         self._next_id = 0
@@ -160,10 +132,10 @@ class RPCClient:
     @asynccontextmanager
     async def _make_ctx(self) -> AsyncIterator["RPCClient"]:
         try:
-            async with self.task_group:
-                self.task_group.start_soon(self.receive_loop)
+            async with anyio.create_task_group() as task_group:
+                task_group.start_soon(self.receive_loop)
                 yield self
-                self.task_group.cancel_scope.cancel()
+                task_group.cancel_scope.cancel()
         finally:
             self.tasks.clear()
 
@@ -194,10 +166,11 @@ class RPCClient:
         await self.send_msg(req)
         task = self.tasks[req.id] = _RequestTask()
 
-        did_send_chunk = anyio.Event()
+        did_send_chunk = False
 
         async def send_stream_chunk(value: Any) -> None:
-            did_send_chunk.set()
+            nonlocal did_send_chunk
+            did_send_chunk = True
             await self.send_msg(RequestStreamChunk(req.id, value))
 
         stream = RequestStream(
@@ -209,7 +182,7 @@ class RPCClient:
         try:
             with task.stream_producer, task.stream_consumer:
                 yield stream
-                if did_send_chunk.is_set():
+                if did_send_chunk:
                     # Sent a stream chunk, must send the stream end
                     await self.send_msg(RequestStreamEnd(req.id))
                 await task.get_response()
@@ -231,14 +204,22 @@ class RPCClient:
             # If we cancel a request, it is possible that responses could come after deleting the task.
             # In this case, we do not care about those responses.
             if task is not None:
-                if isinstance(msg, Response):
-                    await task.response_producer.send(msg)
-                elif isinstance(msg, ResponseStreamChunk):
-                    await task.stream_producer.send(msg.value)
-                elif isinstance(msg, ResponseStreamEnd):
-                    task.stream_producer.close()
-                else:
-                    LOG.warning("Received unhandled message: %s", msg)
+                try:
+                    if isinstance(msg, Response):
+                        await task.response_producer.send(msg)
+                    elif isinstance(msg, ResponseStreamChunk):
+                        await task.stream_producer.send(msg.value)
+                    elif isinstance(msg, ResponseStreamEnd):
+                        task.stream_producer.close()
+                    else:
+                        LOG.warning("Received unhandled message: %s", msg)
+                except anyio.get_cancelled_exc_class():  # pragma: nocover
+                    raise
+                except:
+                    if self.raise_on_error:
+                        raise
+                    else:
+                        LOG.exception("Client receive error: %s", msg)
 
     async def send_msg(self, msg: Message) -> None:
         await self.stream.send(message_to_bytes(msg))

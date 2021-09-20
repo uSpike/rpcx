@@ -1,10 +1,10 @@
 import logging
-from functools import partial
 from typing import Any, Callable, Coroutine
 
 import anyio
-from anyio.abc import AnyByteStream, TaskGroup, TaskStatus
+from anyio.abc import AnyByteStream, TaskStatus
 
+from .manager import RPCManager
 from .message import (
     Message,
     Request,
@@ -18,29 +18,8 @@ from .message import (
     message_from_bytes,
     message_to_bytes,
 )
-from .rpc import RPCManager
 
 LOG = logging.getLogger(__name__)
-
-
-async def task_group_start_callback_error(
-    task_group: TaskGroup,
-    on_exception: Callable[[Exception], None],
-    task: Callable[..., Coroutine[None, None, None]],
-    *args: Any,
-) -> None:
-    """
-    Start a task in a task group, and only call `on_exception` if an exception is raised while running the task.
-    This is useful to prevent an exception raised by a task from poisining an entire task group.
-    """
-
-    async def wrapper(task_status: TaskStatus) -> None:
-        try:
-            await task(*args, task_status=task_status)
-        except Exception as exc:
-            on_exception(exc)
-
-    await task_group.start(wrapper)
 
 
 class RPCServer:
@@ -52,16 +31,24 @@ class RPCServer:
         """
         Handle a request call.
         """
+        sent_stream_chunk = False
+
+        async def send_stream_chunk_wrapper(value: Any) -> None:
+            nonlocal sent_stream_chunk
+            sent_stream_chunk = True
+            await self.send_stream_chunk(request.id, value)
+
         try:
             result = await self.rpc.dispatch_request(
                 request.id,
                 request.method,
                 request.args,
                 request.kwargs,
-                partial(self.send_stream_chunk, request.id),
-                partial(self.send_stream_end, request.id),
+                send_stream_chunk_wrapper,
                 task_status,
             )
+            if sent_stream_chunk:
+                await self.send_stream_end(request.id)
             await self.send_response(request.id, ResponseStatus.OK, result)
         except (TypeError, ValueError) as exc:
             LOG.exception("Invalid request")
@@ -110,13 +97,23 @@ class RPCServer:
             if raise_on_error:
                 raise exc
 
+        async def wrap_task(
+            task: Callable[..., Coroutine[None, None, None]],
+            *args: Any,
+            task_status: TaskStatus,
+        ) -> None:
+            try:
+                await task(*args, task_status=task_status)
+            except Exception as exc:
+                log_error(exc)
+
         async with anyio.create_task_group() as task_group:
             async for data in self.stream:
                 try:
                     msg = message_from_bytes(data)
                     LOG.debug("Receive %s", msg)
                     if isinstance(msg, Request):
-                        await task_group_start_callback_error(task_group, log_error, self.handle_request, msg)
+                        await task_group.start(wrap_task, self.handle_request, msg)
                     else:
                         await self.handle_event(msg)
                 except anyio.get_cancelled_exc_class():  # pragma: nocover

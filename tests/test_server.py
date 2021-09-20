@@ -1,12 +1,5 @@
 import logging
 import math
-import sys
-from contextlib import asynccontextmanager
-
-if sys.version_info >= (3, 8):
-    from unittest.mock import AsyncMock
-else:
-    from mock import AsyncMock
 
 import anyio
 import asyncstdlib as astd
@@ -20,31 +13,6 @@ from rpcx.client import InternalError, InvalidValue, RemoteError
 LOG = logging.getLogger(__name__)
 
 pytestmark = pytest.mark.anyio
-
-
-@pytest.fixture
-def rpc_client():
-    @asynccontextmanager
-    async def ctx(manager: RPCManager):
-        # set up streams for server/client to talk to eachother
-        server_send, server_receive = anyio.create_memory_object_stream(math.inf, item_type=bytes)
-        client_send, client_receive = anyio.create_memory_object_stream(math.inf, item_type=bytes)
-
-        server_stream = StapledObjectStream(client_send, server_receive)
-        client_stream = StapledObjectStream(server_send, client_receive)
-
-        server = RPCServer(server_stream, manager)
-
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(server.serve, True)
-
-            async with RPCClient(client_stream) as client:
-                yield client
-                # allow tasks to finish before we cancel
-                await anyio.wait_all_tasks_blocked()
-                tg.cancel_scope.cancel()
-
-    return ctx
 
 
 def test_manager_clear():
@@ -78,7 +46,7 @@ async def test_manager_aclose():
 
     async with anyio.create_task_group() as task_group:
         task_group.start_soon(
-            rpc.dispatch_request, request.id, request.method, request.args, request.kwargs, dummy_sender, dummy_sender
+            rpc.dispatch_request, request.id, request.method, request.args, request.kwargs, dummy_sender
         )
         await started.wait()
         await rpc.aclose()
@@ -175,14 +143,14 @@ def test_manager_duplicate_name():
         manager.register("foo", lambda: None)
 
 
-async def test_server_simple(rpc_client):
+async def test_server_simple(test_client_stack):
     async def simple(a: int, b: int):
         return a + b
 
     rpc = RPCManager()
     rpc.register("simple", simple)
 
-    async with rpc_client(rpc) as client:
+    async with test_client_stack(rpc) as client:
         response = await client.request("simple", 1, 2)
         assert response == 3
 
@@ -190,19 +158,19 @@ async def test_server_simple(rpc_client):
         assert not rpc.tasks
 
 
-async def test_server_simple_error(rpc_client):
+async def test_server_simple_error(test_client_stack):
     async def simple_error():
         raise Exception("Error!")
 
     rpc = RPCManager()
     rpc.register("simple_error", simple_error)
 
-    async with rpc_client(rpc) as client:
+    async with test_client_stack(rpc) as client:
         with pytest.raises(RemoteError):
             await client.request("simple_error")
 
 
-async def test_server_stream(rpc_client):
+async def test_server_stream(test_client_stack):
     async def server_stream(stream: Stream):
         for i in range(10):
             LOG.debug("server_stream %d", i)
@@ -213,7 +181,7 @@ async def test_server_stream(rpc_client):
     rpc = RPCManager()
     rpc.register("server_stream", server_stream)
 
-    async with rpc_client(rpc) as client:
+    async with test_client_stack(rpc) as client:
         async with client.request_stream("server_stream") as stream:
             async for i, response in astd.enumerate(stream):
                 assert response == i
@@ -230,7 +198,7 @@ async def test_server_stream(rpc_client):
         assert not rpc.tasks
 
 
-async def test_client_stream(rpc_client, caplog):
+async def test_client_stream(test_client_stack, caplog):
     async def client_stream(stream: Stream):
         total = 0
         async for i in stream:
@@ -241,7 +209,7 @@ async def test_client_stream(rpc_client, caplog):
     rpc = RPCManager()
     rpc.register("client_stream", client_stream)
 
-    async with rpc_client(rpc) as client:
+    async with test_client_stack(rpc) as client:
         async with client.request_stream("client_stream") as stream:
             for i in range(10):
                 await stream.send(i)
@@ -249,7 +217,7 @@ async def test_client_stream(rpc_client, caplog):
         assert await stream == sum(range(10))
 
 
-async def test_bidirectional_stream(rpc_client):
+async def test_bidirectional_stream(test_client_stack):
     async def bidirectional_stream(stream: Stream):
         async for i in stream:
             val = i + 1
@@ -259,7 +227,7 @@ async def test_bidirectional_stream(rpc_client):
     rpc = RPCManager()
     rpc.register("bidirectional_stream", bidirectional_stream)
 
-    async with rpc_client(rpc) as client:
+    async with test_client_stack(rpc) as client:
         async with client.request_stream("bidirectional_stream") as stream:
             i = 0
             await stream.send(i)
@@ -271,27 +239,27 @@ async def test_bidirectional_stream(rpc_client):
                     break
 
 
-async def test_invalid_name(rpc_client):
+async def test_invalid_name(test_client_stack):
     rpc = RPCManager()
 
-    async with rpc_client(rpc) as client:
+    async with test_client_stack(rpc) as client:
         with pytest.raises(InvalidValue):
             await client.request("invalid")
 
 
-async def test_bad_args(rpc_client):
+async def test_bad_args(test_client_stack):
     async def simple(a: int, b: int):
         return a + b
 
     rpc = RPCManager()
     rpc.register("simple", simple)
 
-    async with rpc_client(rpc) as client:
+    async with test_client_stack(rpc) as client:
         with pytest.raises(InvalidValue):
             await client.request("simple", 1, 2, 3, 4, 5)
 
 
-async def test_cancel(rpc_client):
+async def test_cancel(test_client_stack):
     started_event = anyio.Event()
     cancelled_event = anyio.Event()
 
@@ -306,7 +274,7 @@ async def test_cancel(rpc_client):
     rpc = RPCManager()
     rpc.register("simple_cancel", simple_cancel)
 
-    async with rpc_client(rpc) as client:
+    async with test_client_stack(rpc) as client:
 
         async def cancel_soon():
             await started_event.wait()
@@ -320,7 +288,7 @@ async def test_cancel(rpc_client):
             await cancelled_event.wait()
 
 
-async def test_cancel_stream(rpc_client):
+async def test_cancel_stream(test_client_stack):
     started_event = anyio.Event()
     cancelled_event = anyio.Event()
 
@@ -335,7 +303,7 @@ async def test_cancel_stream(rpc_client):
     rpc = RPCManager()
     rpc.register("simple_cancel", simple_cancel)
 
-    async with rpc_client(rpc) as client:
+    async with test_client_stack(rpc) as client:
 
         async def cancel_soon():
             await started_event.wait()
@@ -367,25 +335,3 @@ def test_response_status():
 
     response = message.Response(0, message.ResponseStatus.INTERNAL, None)
     assert response.status_is_internal
-
-
-async def test_websockets_stream(mocker):
-    from websockets.exceptions import ConnectionClosed
-
-    from rpcx.client import WebSocketsStream
-
-    stream = WebSocketsStream(AsyncMock())
-
-    await stream.receive()
-    stream.websocket.recv.assert_called_once()
-
-    await stream.send(b"foo")
-    stream.websocket.send.assert_called_once()
-
-    stream.websocket.recv.side_effect = ConnectionClosed(1000, "foo")
-    with pytest.raises(anyio.EndOfStream):
-        await stream.receive()
-
-    stream.websocket.send.side_effect = ConnectionClosed(1000, "foo")
-    with pytest.raises(anyio.EndOfStream):
-        await stream.send(b"foo")

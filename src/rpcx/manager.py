@@ -98,7 +98,6 @@ class RPCManager:
         args: Tuple[Any, ...],
         kwargs: Dict[str, Any],
         send_stream_chunk: Callable[[Any], Coroutine[None, None, None]],
-        send_stream_end: Callable[[], Coroutine[None, None, None]],
         task_status: TaskStatus = TASK_STATUS_IGNORED,
     ) -> Any:
         """
@@ -109,14 +108,8 @@ class RPCManager:
         if method is None:
             raise ValueError(f"Invalid method: '{method_name}'")
 
-        did_send_chunk = anyio.Event()
-
-        async def send_stream_chunk_event(value: Any) -> None:
-            did_send_chunk.set()
-            await send_stream_chunk(value)
-
         task = self.tasks[request_id] = Task()
-        stream = task.stream = Stream(send_stream_chunk_event)
+        stream = task.stream = Stream(send_stream_chunk)
 
         try:
             with task.cancel_scope, stream.stream_producer, stream.stream_consumer:
@@ -124,12 +117,7 @@ class RPCManager:
                     kwargs[method.stream_arg] = stream
 
                 LOG.debug("Dispatch: %s %s %s", method_name, args, kwargs)
-                result = await method.func(*args, **kwargs)
-
-                if did_send_chunk.is_set():
-                    await send_stream_end()
-
-                return result
+                return await method.func(*args, **kwargs)
         finally:
             del self.tasks[request_id]
 
