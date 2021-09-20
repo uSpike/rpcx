@@ -97,8 +97,6 @@ class RequestStream(Awaitable[Any], AsyncIterator["RequestStream"]):
     async def __anext__(self) -> Any:
         try:
             return await self._stream_consumer.receive()
-        except anyio.get_cancelled_exc_class():
-            raise
         except anyio.EndOfStream:
             raise StopAsyncIteration()
 
