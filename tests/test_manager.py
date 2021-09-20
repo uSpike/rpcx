@@ -7,7 +7,7 @@ from rpcx.message import Request
 pytestmark = pytest.mark.anyio
 
 
-def test_manager_clear():
+def test_clear():
     rpc = RPCManager()
     rpc.register("foo", lambda: None)
     assert rpc.methods
@@ -15,14 +15,14 @@ def test_manager_clear():
     assert not rpc.methods
 
 
-def test_manager_duplicate_name():
+def test_duplicate_name():
     manager = RPCManager()
     manager.register("foo", lambda: None)
     with pytest.raises(ValueError):
         manager.register("foo", lambda: None)
 
 
-async def test_manager_aclose():
+async def test_aclose():
     rpc = RPCManager()
 
     started = anyio.Event()
