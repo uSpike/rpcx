@@ -71,7 +71,8 @@ class Task:
 class RPCManager:
     def __init__(self) -> None:
         self.methods: Dict[str, RPCMethod] = {}
-        self.tasks: Dict[int, Task] = {}
+        # Keys are (token, request_id)
+        self.tasks: Dict[Tuple[int, int], Task] = {}
 
     def register(self, method_name: str, func: Callable[..., Any]) -> None:
         """
@@ -88,11 +89,12 @@ class RPCManager:
         for task in self.tasks.values():
             task.cancel_scope.cancel()
 
-    def task_exists(self, request_id: int) -> bool:
-        return request_id in self.tasks
+    def task_exists(self, token: int, request_id: int) -> bool:
+        return (token, request_id) in self.tasks
 
     async def dispatch_request(
         self,
+        token: int,
         request_id: int,
         method_name: str,
         args: Tuple[Any, ...],
@@ -108,7 +110,8 @@ class RPCManager:
         if method is None:
             raise ValueError(f"Invalid method: '{method_name}'")
 
-        task = self.tasks[request_id] = Task()
+        task_key = (token, request_id)
+        task = self.tasks[task_key] = Task()
         stream = task.stream = Stream(send_stream_chunk)
 
         try:
@@ -119,18 +122,18 @@ class RPCManager:
                 LOG.debug("Dispatch: %s %s %s", method_name, args, kwargs)
                 return await method.func(*args, **kwargs)
         finally:
-            del self.tasks[request_id]
+            del self.tasks[task_key]
 
-    async def dispatch_stream_chunk(self, request_id: int, value: Any) -> None:
-        task = self.tasks[request_id]
+    async def dispatch_stream_chunk(self, token: int, request_id: int, value: Any) -> None:
+        task = self.tasks[(token, request_id)]
         if task.stream is not None:
             await task.stream.stream_producer.send(value)
 
-    async def dispatch_stream_end(self, request_id: int) -> None:
-        task = self.tasks[request_id]
+    async def dispatch_stream_end(self, token: int, request_id: int) -> None:
+        task = self.tasks[(token, request_id)]
         if task.stream is not None:
             await task.stream.stream_producer.aclose()
 
-    def dispatch_cancel(self, request_id: int) -> None:
-        task = self.tasks[request_id]
+    def dispatch_cancel(self, token: int, request_id: int) -> None:
+        task = self.tasks[(token, request_id)]
         task.cancel_scope.cancel()

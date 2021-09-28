@@ -1,9 +1,16 @@
 import logging
 import math
+import sys
 
 import anyio
 import pytest
 from anyio.streams.stapled import StapledObjectStream
+
+if sys.version_info >= (3, 8):
+    from unittest.mock import AsyncMock
+else:
+    from mock import AsyncMock
+
 
 from rpcx import RPCManager, RPCServer
 from rpcx.message import Message, Request, RequestCancel, Response, ResponseStatus, message_to_bytes
@@ -79,3 +86,26 @@ async def test_unhandled_message(caplog):
             tg.cancel_scope.cancel()
 
     assert "Received unhandled message" in caplog.text
+
+
+async def test_token(mocker):
+    rpc = RPCManager()
+
+    stream = StapledObjectStream(*anyio.create_memory_object_stream(math.inf, item_type=bytes))
+    server = RPCServer(stream, rpc, token=1)
+
+    assert server.token == 1
+    msg = Request(id=0, method="foo", args=(), kwargs={})
+
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(server.serve)
+        mock = rpc.dispatch_request = AsyncMock(return_value=None)
+
+        await stream.send(message_to_bytes(msg))
+        await anyio.wait_all_tasks_blocked()
+
+        mock.assert_called_once()
+        assert mock.call_args[0][0] == 1  # token
+        assert mock.call_args[0][1] == 0  # request_id
+
+        tg.cancel_scope.cancel()

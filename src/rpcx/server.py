@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable, Coroutine, Optional
 
 import anyio
 from anyio.abc import AnyByteStream, TaskStatus
@@ -23,9 +23,13 @@ LOG = logging.getLogger(__name__)
 
 
 class RPCServer:
-    def __init__(self, stream: AnyByteStream, rpc: RPCManager) -> None:
+    def __init__(self, stream: AnyByteStream, rpc: RPCManager, token: Optional[int] = None) -> None:
         self.stream = stream
         self.rpc = rpc
+        if token is not None:
+            self.token = token
+        else:
+            self.token = id(self)
 
     async def handle_request(self, request: Request, task_status: TaskStatus) -> None:
         """
@@ -40,6 +44,7 @@ class RPCServer:
 
         try:
             result = await self.rpc.dispatch_request(
+                self.token,
                 request.id,
                 request.method,
                 request.args,
@@ -64,14 +69,14 @@ class RPCServer:
           - Stream chunks
           - Stream end
         """
-        if not self.rpc.task_exists(msg.id):
+        if not self.rpc.task_exists(self.token, msg.id):
             LOG.warning("Requested non-existing task: %s", msg)
         elif isinstance(msg, RequestCancel):
-            self.rpc.dispatch_cancel(msg.id)
+            self.rpc.dispatch_cancel(self.token, msg.id)
         elif isinstance(msg, RequestStreamChunk):
-            await self.rpc.dispatch_stream_chunk(msg.id, msg.value)
+            await self.rpc.dispatch_stream_chunk(self.token, msg.id, msg.value)
         elif isinstance(msg, RequestStreamEnd):
-            await self.rpc.dispatch_stream_end(msg.id)
+            await self.rpc.dispatch_stream_end(self.token, msg.id)
         else:
             LOG.warning("Received unhandled message: %s", msg)
 

@@ -45,7 +45,7 @@ async def test_aclose():
 
     async with anyio.create_task_group() as task_group:
         task_group.start_soon(
-            rpc.dispatch_request, request.id, request.method, request.args, request.kwargs, dummy_sender
+            rpc.dispatch_request, 0, request.id, request.method, request.args, request.kwargs, dummy_sender
         )
         await started.wait()
         await rpc.aclose()
