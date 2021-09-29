@@ -3,16 +3,17 @@ import pytest
 
 from rpcx import RPCManager
 from rpcx.message import Request
+from rpcx.server import Dispatcher
 
 pytestmark = pytest.mark.anyio
 
 
 def test_clear():
-    rpc = RPCManager()
-    rpc.register("foo", lambda: None)
-    assert rpc.methods
-    rpc.clear()
-    assert not rpc.methods
+    manager = RPCManager()
+    manager.register("foo", lambda: None)
+    assert manager.methods
+    manager.clear()
+    assert not manager.methods
 
 
 def test_duplicate_name():
@@ -23,7 +24,7 @@ def test_duplicate_name():
 
 
 async def test_aclose():
-    rpc = RPCManager()
+    manager = RPCManager()
 
     started = anyio.Event()
     cancelled = anyio.Event()
@@ -36,7 +37,8 @@ async def test_aclose():
             cancelled.set()
             raise
 
-    rpc.register("long_task", long_task)
+    manager.register("long_task", long_task)
+    dispatcher = Dispatcher(manager)
 
     request = Request(id=0, method="long_task", args=(), kwargs={})
 
@@ -45,9 +47,9 @@ async def test_aclose():
 
     async with anyio.create_task_group() as task_group:
         task_group.start_soon(
-            rpc.dispatch_request, request.id, request.method, request.args, request.kwargs, dummy_sender
+            dispatcher.request, request.id, request.method, request.args, request.kwargs, dummy_sender
         )
         await started.wait()
-        await rpc.aclose()
+        await dispatcher.aclose()
         await cancelled.wait()
-        assert not rpc.tasks
+        assert not dispatcher.tasks
