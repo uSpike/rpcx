@@ -12,34 +12,34 @@ LOG = logging.getLogger(__name__)
 pytestmark = pytest.mark.anyio
 
 
-async def test_simple(test_client_stack):
+async def test_simple(test_stack):
     async def simple(a: int, b: int):
         return a + b
 
-    rpc = RPCManager()
-    rpc.register("simple", simple)
+    manager = RPCManager()
+    manager.register("simple", simple)
 
-    async with test_client_stack(rpc) as client:
-        response = await client.request("simple", 1, 2)
+    async with test_stack(manager) as stack:
+        response = await stack.client.request("simple", 1, 2)
         assert response == 3
 
-        assert not client.tasks
-        assert not rpc.tasks
+        assert not stack.client.tasks
+        assert not stack.server.dispatcher.tasks
 
 
-async def test_simple_error(test_client_stack):
+async def test_simple_error(test_stack):
     async def simple_error():
         raise Exception("Error!")
 
-    rpc = RPCManager()
-    rpc.register("simple_error", simple_error)
+    manager = RPCManager()
+    manager.register("simple_error", simple_error)
 
-    async with test_client_stack(rpc) as client:
+    async with test_stack(manager) as stack:
         with pytest.raises(RemoteError):
-            await client.request("simple_error")
+            await stack.client.request("simple_error")
 
 
-async def test_stream(test_client_stack):
+async def test_stream(test_stack):
     async def server_stream(stream: Stream):
         for i in range(10):
             LOG.debug("server_stream %d", i)
@@ -47,27 +47,27 @@ async def test_stream(test_client_stack):
 
         return "vincent loves strings"
 
-    rpc = RPCManager()
-    rpc.register("server_stream", server_stream)
+    manager = RPCManager()
+    manager.register("server_stream", server_stream)
 
-    async with test_client_stack(rpc) as client:
-        async with client.request_stream("server_stream") as stream:
+    async with test_stack(manager) as stack:
+        async with stack.client.request_stream("server_stream") as stream:
             async for i, response in astd.enumerate(stream):
                 assert response == i
 
             # There is a task in this context
-            assert client.tasks
+            assert stack.client.tasks
 
         # We've left the client stream context, no more tasks
-        assert not client.tasks
+        assert not stack.client.tasks
 
         # Then we can still await a result from the stream
         assert await stream == "vincent loves strings"
         # And the server task has finished
-        assert not rpc.tasks
+        assert not stack.server.dispatcher.tasks
 
 
-async def test_client_stream(test_client_stack, caplog):
+async def test_client_stream(test_stack, caplog):
     async def client_stream(stream: Stream):
         total = 0
         async for i in stream:
@@ -75,29 +75,29 @@ async def test_client_stream(test_client_stack, caplog):
             LOG.debug("client_stream %d", i)
         return total
 
-    rpc = RPCManager()
-    rpc.register("client_stream", client_stream)
+    manager = RPCManager()
+    manager.register("client_stream", client_stream)
 
-    async with test_client_stack(rpc) as client:
-        async with client.request_stream("client_stream") as stream:
+    async with test_stack(manager) as stack:
+        async with stack.client.request_stream("client_stream") as stream:
             for i in range(10):
                 await stream.send(i)
 
         assert await stream == sum(range(10))
 
 
-async def test_bidirectional_stream(test_client_stack):
+async def test_bidirectional_stream(test_stack):
     async def bidirectional_stream(stream: Stream):
         async for i in stream:
             val = i + 1
             LOG.debug("bidir stream %d->%d", i, val)
             await stream.send(val)
 
-    rpc = RPCManager()
-    rpc.register("bidirectional_stream", bidirectional_stream)
+    manager = RPCManager()
+    manager.register("bidirectional_stream", bidirectional_stream)
 
-    async with test_client_stack(rpc) as client:
-        async with client.request_stream("bidirectional_stream") as stream:
+    async with test_stack(manager) as stack:
+        async with stack.client.request_stream("bidirectional_stream") as stream:
             i = 0
             await stream.send(i)
             async for response in stream:
@@ -108,27 +108,27 @@ async def test_bidirectional_stream(test_client_stack):
                     break
 
 
-async def test_invalid_name(test_client_stack):
-    rpc = RPCManager()
+async def test_invalid_name(test_stack):
+    manager = RPCManager()
 
-    async with test_client_stack(rpc) as client:
+    async with test_stack(manager) as stack:
         with pytest.raises(InvalidValue):
-            await client.request("invalid")
+            await stack.client.request("invalid")
 
 
-async def test_bad_args(test_client_stack):
+async def test_bad_args(test_stack):
     async def simple(a: int, b: int):
         return a + b
 
-    rpc = RPCManager()
-    rpc.register("simple", simple)
+    manager = RPCManager()
+    manager.register("simple", simple)
 
-    async with test_client_stack(rpc) as client:
+    async with test_stack(manager) as stack:
         with pytest.raises(InvalidValue):
-            await client.request("simple", 1, 2, 3, 4, 5)
+            await stack.client.request("simple", 1, 2, 3, 4, 5)
 
 
-async def test_cancel(test_client_stack):
+async def test_cancel(test_stack):
     started_event = anyio.Event()
     cancelled_event = anyio.Event()
 
@@ -140,10 +140,10 @@ async def test_cancel(test_client_stack):
             cancelled_event.set()
             raise
 
-    rpc = RPCManager()
-    rpc.register("simple_cancel", simple_cancel)
+    manager = RPCManager()
+    manager.register("simple_cancel", simple_cancel)
 
-    async with test_client_stack(rpc) as client:
+    async with test_stack(manager) as stack:
 
         async def cancel_soon():
             await started_event.wait()
@@ -151,13 +151,13 @@ async def test_cancel(test_client_stack):
 
         async with anyio.create_task_group() as tg:
             tg.start_soon(cancel_soon)
-            await client.request("simple_cancel")
+            await stack.client.request("simple_cancel")
 
         with anyio.fail_after(1):
             await cancelled_event.wait()
 
 
-async def test_cancel_stream(test_client_stack):
+async def test_cancel_stream(test_stack):
     started_event = anyio.Event()
     cancelled_event = anyio.Event()
 
@@ -169,10 +169,10 @@ async def test_cancel_stream(test_client_stack):
             cancelled_event.set()
             raise
 
-    rpc = RPCManager()
-    rpc.register("simple_cancel", simple_cancel)
+    manager = RPCManager()
+    manager.register("simple_cancel", simple_cancel)
 
-    async with test_client_stack(rpc) as client:
+    async with test_stack(manager) as stack:
 
         async def cancel_soon():
             await started_event.wait()
@@ -180,7 +180,7 @@ async def test_cancel_stream(test_client_stack):
 
         async with anyio.create_task_group() as tg:
             tg.start_soon(cancel_soon)
-            async with client.request_stream("simple_cancel"):
+            async with stack.client.request_stream("simple_cancel"):
                 await anyio.sleep_forever()
 
         with anyio.fail_after(1):
