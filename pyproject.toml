@@ -7,6 +7,7 @@ license = "MIT"
 repository = "https://github.com/uSpike/rpcx"
 readme = "README.md"
 classifiers = [
+    "Framework :: AnyIO",
     "Framework :: AsyncIO",
     "Framework :: Trio",
     "Development Status :: 4 - Beta",
