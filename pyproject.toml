@@ -68,13 +68,12 @@ exclude = '''
 profile = "black"
 line_length = 120
 
-[tool.flakehell]
+[tool.flakeheaven]
 format = "colored"
 show_source = true
 max_line_length = 120
-extended_default_ignore=[]  # https://github.com/flakehell/flakehell/issues/10
 
-[tool.flakehell.plugins]
+[tool.flakeheaven.plugins]
 # Ignore redefinition of variable name in new scope
 pyflakes = ["+*", "-F823"]
 flake8-bandit = ["+*"]
@@ -88,7 +87,7 @@ flake8-mutable = ["+*"]
 flake8-pytest-style = ["+*"]
 flake8-spellcheck = ["+*"]
 
-[tool.flakehell.exceptions."**/__init__.py"]
+[tool.flakeheaven.exceptions."**/__init__.py"]
 # Ignore unused imports in __init__.py files
 pyflakes = ["-F401"]
 
