@@ -26,7 +26,7 @@ python-versions = ">=3.5"
 
 [[package]]
 name = "asyncstdlib"
-version = "3.10.2"
+version = "3.10.3"
 description = "The missing async toolbox"
 category = "main"
 optional = false
@@ -540,8 +540,8 @@ async-generator = [
     {file = "async_generator-1.10.tar.gz", hash = "sha256:6ebb3d106c12920aaae42ccb6f787ef5eefdcdd166ea3d628fa8476abe712144"},
 ]
 asyncstdlib = [
-    {file = "asyncstdlib-3.10.2-py2.py3-none-any.whl", hash = "sha256:129460e26b10c4f07f3255a2fa291b23868c9233389caaa883cca142194872d8"},
-    {file = "asyncstdlib-3.10.2.tar.gz", hash = "sha256:474a3e73db68fb5a7fd416ac08354a6f137be39f56a4bc315662f1dfd580a4fb"},
+    {file = "asyncstdlib-3.10.3-py2.py3-none-any.whl", hash = "sha256:35d34eca050b847fe45cbb10a07a55c15ef1cb43e59d4abfcbdebe90df30a6f6"},
+    {file = "asyncstdlib-3.10.3.tar.gz", hash = "sha256:4d836c65769761a47795667ed72f3de6cf4a25e480959f75fd91eb8eb5edc640"},
 ]
 atomicwrites = [
     {file = "atomicwrites-1.4.0-py2.py3-none-any.whl", hash = "sha256:6d1784dea7c0c8d4a5172b6c620f40b6e4cbfdf96d783691f2e1302a7b88e197"},
