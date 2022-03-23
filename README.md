@@ -63,16 +63,16 @@ async def main() -> None:
             assert await client.request("add", 1, 2) == 3
 
             # Streaming (server to client) example
-            async with client.request_stream("fibonacci", 6) as stream:
+            async with client.request_stream("fibonacci", 6) as request, request.stream as stream:
                 async for num in stream:
                     print(num)  # 1, 1, 2, 3, 5, 8
 
             # Streaming (client to server) example
-            async with client.request_stream("sum") as stream:
+            async with client.request_stream("sum") as request, request.stream as stream:
                 for num in range(10):
                     await stream.send(num)
 
-            assert await stream == 45
+                assert await request == 45
 
 
 anyio.run(main)

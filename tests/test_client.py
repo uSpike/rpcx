@@ -30,6 +30,14 @@ async def test_response(test_client):
     )
 
 
+async def test_stream_no_enter_context(test_client):
+    async with test_client.client as client:
+        with pytest.raises(RuntimeError, match="Stream must have entered context to iterate"):
+            async with client.request_stream("any") as request:
+                async for item in request.stream:
+                    pass
+
+
 async def test_cancel(test_client):
     async with test_client.client as client:
         async with anyio.create_task_group() as task_group:
@@ -55,15 +63,16 @@ async def test_stream_response(test_client):
     await test_client.server_stream.send(message_to_bytes(Response(id=1, status=ResponseStatus.OK, value="1")))
 
     async with test_client.client as client:
-        async with client.request_stream("any") as stream:
+        async with client.request_stream("any") as request:
             assert message_from_bytes(await test_client.server_stream.receive()) == Request(
                 id=1, method="any", args=(), kwargs={}
             )
             items = []
-            async for item in stream:
-                items.append(item)
+            async with request.stream as stream:
+                async for item in stream:
+                    items.append(item)
             assert items == ["a", "b", "c"]
-        assert await stream == "1"
+            assert await request == "1"
 
 
 async def test_stream_receive_data_after_task_ends(test_client, caplog):
@@ -76,12 +85,12 @@ async def test_stream_receive_data_after_task_ends(test_client, caplog):
 
     async with test_client.client as client:
         client.raise_on_error = False
-        async with client.request_stream("any") as stream:
+        async with client.request_stream("any") as request, request.stream as stream:
             items = []
             async for item in stream:
                 items.append(item)
             assert items == ["a", "b", "c"]
-        assert await stream == "1"
+            assert await request == "1"
         assert "Client receive error: ResponseStreamChunk(id=1, value='d')" in caplog.text
 
 
@@ -89,7 +98,7 @@ async def test_stream_cancel(test_client):
     async with test_client.client as client:
         items = []
         async with anyio.create_task_group() as task_group:
-            async with client.request_stream("any") as stream:
+            async with client.request_stream("any") as request, request.stream as stream:
 
                 async def cancel_soon():
                     await anyio.wait_all_tasks_blocked()
@@ -103,32 +112,33 @@ async def test_stream_cancel(test_client):
                 async for item in stream:
                     items.append(item)
 
-        assert items == ["a"]
-        assert message_from_bytes(await test_client.server_stream.receive()) == Request(
-            id=1, method="any", args=(), kwargs={}
-        )
-        assert message_from_bytes(await test_client.server_stream.receive()) == RequestCancel(id=1)
+                assert items == ["a"]
+                assert message_from_bytes(await test_client.server_stream.receive()) == Request(
+                    id=1, method="any", args=(), kwargs={}
+                )
+                assert message_from_bytes(await test_client.server_stream.receive()) == RequestCancel(id=1)
 
 
 async def test_send_stream(test_client):
 
     async with test_client.client as client:
-        async with client.request_stream("any") as stream:
-            await stream.send("a")
-            await stream.send("b")
-            await stream.send("c")
+        async with client.request_stream("any") as request:
+            async with request.stream as stream:
+                await stream.send("a")
+                await stream.send("b")
+                await stream.send("c")
 
             await test_client.server_stream.send(message_to_bytes(Response(id=1, status=ResponseStatus.OK, value="1")))
 
-        assert await stream == "1"
+            assert await request == "1"
 
-        assert message_from_bytes(await test_client.server_stream.receive()) == Request(
-            id=1, method="any", args=(), kwargs={}
-        )
-        assert message_from_bytes(await test_client.server_stream.receive()) == RequestStreamChunk(id=1, value="a")
-        assert message_from_bytes(await test_client.server_stream.receive()) == RequestStreamChunk(id=1, value="b")
-        assert message_from_bytes(await test_client.server_stream.receive()) == RequestStreamChunk(id=1, value="c")
-        assert message_from_bytes(await test_client.server_stream.receive()) == RequestStreamEnd(id=1)
+            assert message_from_bytes(await test_client.server_stream.receive()) == Request(
+                id=1, method="any", args=(), kwargs={}
+            )
+            assert message_from_bytes(await test_client.server_stream.receive()) == RequestStreamChunk(id=1, value="a")
+            assert message_from_bytes(await test_client.server_stream.receive()) == RequestStreamChunk(id=1, value="b")
+            assert message_from_bytes(await test_client.server_stream.receive()) == RequestStreamChunk(id=1, value="c")
+            assert message_from_bytes(await test_client.server_stream.receive()) == RequestStreamEnd(id=1)
 
 
 async def test_receive_unhandled_message(test_client, caplog):

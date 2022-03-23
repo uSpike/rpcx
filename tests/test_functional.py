@@ -51,9 +51,10 @@ async def test_stream(test_stack):
     manager.register("server_stream", server_stream)
 
     async with test_stack(manager) as stack:
-        async with stack.client.request_stream("server_stream") as stream:
-            async for i, response in astd.enumerate(stream):
-                assert response == i
+        async with stack.client.request_stream("server_stream") as request:
+            async with request.stream as stream:
+                async for i, response in astd.enumerate(stream):
+                    assert response == i
 
             # There is a task in this context
             assert stack.client.tasks
@@ -62,7 +63,7 @@ async def test_stream(test_stack):
         assert not stack.client.tasks
 
         # Then we can still await a result from the stream
-        assert await stream == "vincent loves strings"
+        assert await request == "vincent loves strings"
         # And the server task has finished
         assert not stack.server.dispatcher.tasks
 
@@ -79,11 +80,12 @@ async def test_client_stream(test_stack, caplog):
     manager.register("client_stream", client_stream)
 
     async with test_stack(manager) as stack:
-        async with stack.client.request_stream("client_stream") as stream:
-            for i in range(10):
-                await stream.send(i)
+        async with stack.client.request_stream("client_stream") as request:
+            async with request.stream as stream:
+                for i in range(10):
+                    await stream.send(i)
 
-        assert await stream == sum(range(10))
+        assert await request == sum(range(10))
 
 
 async def test_bidirectional_stream(test_stack):
@@ -97,15 +99,16 @@ async def test_bidirectional_stream(test_stack):
     manager.register("bidirectional_stream", bidirectional_stream)
 
     async with test_stack(manager) as stack:
-        async with stack.client.request_stream("bidirectional_stream") as stream:
+        async with stack.client.request_stream("bidirectional_stream") as request:
             i = 0
-            await stream.send(i)
-            async for response in stream:
-                i += 1
-                assert response == i
+            async with request.stream as stream:
                 await stream.send(i)
-                if i >= 10:
-                    break
+                async for response in stream:
+                    i += 1
+                    assert response == i
+                    await stream.send(i)
+                    if i >= 10:
+                        break
 
 
 async def test_invalid_name(test_stack):
@@ -179,9 +182,9 @@ async def test_cancel_stream(test_stack):
             tg.cancel_scope.cancel()
 
         async with anyio.create_task_group() as tg:
-            tg.start_soon(cancel_soon)
-            async with stack.client.request_stream("simple_cancel"):
-                await anyio.sleep_forever()
+            async with stack.client.request_stream("simple_cancel") as request:
+                tg.start_soon(cancel_soon)
+                await request
 
         with anyio.fail_after(1):
             await cancelled_event.wait()
