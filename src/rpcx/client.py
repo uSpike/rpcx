@@ -11,7 +11,6 @@ else:  # pragma: nocover
     from typing import Awaitable
 
 import anyio
-import asyncstdlib as astd
 from anyio.abc import AnyByteStream
 from anyio.streams.memory import MemoryObjectReceiveStream
 
@@ -60,19 +59,25 @@ class _RequestTask:
     Container for streams associated with a request.
     """
 
+    _value: Any = object()
+
     def __init__(self) -> None:
         # There will only ever be one response, buffer size of 1 is appropriate
         self.response_producer, self.response_consumer = anyio.create_memory_object_stream(1, item_type=Response)
         # There may be many stream chunks, do not block on receiving them.
         self.stream_producer, self.stream_consumer = anyio.create_memory_object_stream(math.inf)
 
-    @astd.lru_cache(maxsize=1)  # type: ignore[misc]
     async def get_response(self) -> Any:
+        if self._value is not _RequestTask._value:
+            # return cached value
+            return self._value
+
         with self.response_producer, self.response_consumer:
             response = await self.response_consumer.receive()
+            self._value = response.value
 
             if response.status_is_ok:
-                return response.value
+                return self._value
             elif response.status_is_invalid:
                 raise InvalidValue(response.value)
             elif response.status_is_internal:
@@ -113,7 +118,7 @@ class RPCClient:
         self._next_id = 0
         # This represents the maximum number of concurrent requests
         # We don't want this to be huge so the message size stays small
-        self._max_id = 2 ** 16 - 1
+        self._max_id = 2**16 - 1
         self._timeout = 10
 
     @property
