@@ -7,7 +7,7 @@ from typing import cast
 
 import anyio
 from anyio.abc import ObjectStream
-from websockets.client import WebSocketClientProtocol  # type: ignore[attr-defined]
+from websockets.client import WebSocketClientProtocol
 from websockets.exceptions import ConnectionClosed
 
 
