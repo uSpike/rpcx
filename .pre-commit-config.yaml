@@ -26,8 +26,8 @@ repos:
         name: isort (cython)
         types: ["cython"]
 
-  - repo: https://github.com/ambv/black
-    rev: 21.5b1
+  - repo: https://github.com/psf/black
+    rev: 22.3.0
     hooks:
       - id: black
 
