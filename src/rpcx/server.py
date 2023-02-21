@@ -2,6 +2,7 @@ import inspect
 import logging
 import math
 import sys
+import traceback
 from dataclasses import dataclass, field
 from typing import Any, Callable, Coroutine, Dict, Optional, Tuple, get_type_hints
 
@@ -184,12 +185,12 @@ class RPCServer:
             if sent_stream_chunk:
                 await self.send_stream_end(request.id)
             await self.send_response(request.id, ResponseStatus.OK, result)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError):
             LOG.exception("Invalid request")
-            await self.send_response(request.id, ResponseStatus.INVALID, repr(exc))
+            await self.send_response(request.id, ResponseStatus.INVALID, traceback.format_exc())
         except Exception as exc:
             LOG.warning("rpc error: %s", request, exc_info=exc)
-            await self.send_response(request.id, ResponseStatus.ERROR, repr(exc))
+            await self.send_response(request.id, ResponseStatus.ERROR, traceback.format_exc())
 
     async def handle_event(self, msg: Message) -> None:
         """
