@@ -35,7 +35,7 @@ async def test_simple_error(test_stack):
     manager.register("simple_error", simple_error)
 
     async with test_stack(manager) as stack:
-        with pytest.raises(RemoteError):
+        with pytest.raises(RemoteError, match="Traceback \(most recent call last\):\\n"):
             await stack.client.request("simple_error")
 
 
