@@ -21,7 +21,7 @@ packages = [
 python = "^3.7"
 anyio = "^3"
 msgpack = "^1"
-websockets = "^10"
+websockets = "^11.0.0"
 
 [tool.poetry.dev-dependencies]
 msgpack-types = "^0.2"
