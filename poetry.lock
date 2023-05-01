@@ -36,14 +36,14 @@ files = [
 
 [[package]]
 name = "asyncstdlib"
-version = "3.10.6"
+version = "3.10.7"
 description = "The missing async toolbox"
 category = "dev"
 optional = false
 python-versions = "~=3.6"
 files = [
-    {file = "asyncstdlib-3.10.6-py3-none-any.whl", hash = "sha256:d8fc12e720e1918e546e90c923e29d5b4728f5c1fccbd0aee47198e908125025"},
-    {file = "asyncstdlib-3.10.6.tar.gz", hash = "sha256:c9b42dab38c97957e3382db4238d2fd4dd632d5f10f178392ac29a434dc4407f"},
+    {file = "asyncstdlib-3.10.7-py3-none-any.whl", hash = "sha256:5f69bf44789002a6e2a1165f1421bfc93c51ed453b1d91678a2487fdaf7e87d9"},
+    {file = "asyncstdlib-3.10.7.tar.gz", hash = "sha256:e7238a519d3be21cff167838028d67c2531a735907a177aaca25146989b70864"},
 ]
 
 [package.dependencies]
