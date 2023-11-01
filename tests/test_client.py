@@ -111,7 +111,6 @@ async def test_stream_cancel(test_client):
 
 
 async def test_send_stream(test_client):
-
     async with test_client.client as client:
         async with client.request_stream("any") as stream:
             await stream.send("a")
