@@ -63,9 +63,9 @@ class _RequestTask:
 
     def __init__(self) -> None:
         # There will only ever be one response, buffer size of 1 is appropriate
-        self.response_producer, self.response_consumer = anyio.create_memory_object_stream(1, item_type=Response)
+        self.response_producer, self.response_consumer = anyio.create_memory_object_stream[Response](1)
         # There may be many stream chunks, do not block on receiving them.
-        self.stream_producer, self.stream_consumer = anyio.create_memory_object_stream(math.inf)
+        self.stream_producer, self.stream_consumer = anyio.create_memory_object_stream[Any](math.inf)
 
     async def get_response(self) -> Any:
         if self._value is not _RequestTask._value:
