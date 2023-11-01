@@ -48,8 +48,8 @@ manager.register("sum", sum)
 
 async def main() -> None:
     # Create two connected stapled streams to simulate a network connection
-    server_send, server_receive = anyio.create_memory_object_stream(math.inf, item_type=bytes)
-    client_send, client_receive = anyio.create_memory_object_stream(math.inf, item_type=bytes)
+    server_send, server_receive = anyio.create_memory_object_stream[bytes](math.inf)
+    client_send, client_receive = anyio.create_memory_object_stream[bytes](math.inf)
     server_stream = StapledObjectStream(client_send, server_receive)
     client_stream = StapledObjectStream(server_send, client_receive)
 

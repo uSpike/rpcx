@@ -82,7 +82,7 @@ class Stream(AsyncIterator["Stream"]):
     send: Callable[[Any], Coroutine[None, None, None]]
 
     def __post_init__(self) -> None:
-        self.stream_producer, self.stream_consumer = anyio.create_memory_object_stream(math.inf)
+        self.stream_producer, self.stream_consumer = anyio.create_memory_object_stream[Any](math.inf)
 
     def __aiter__(self) -> "Stream":
         return self
@@ -119,7 +119,7 @@ class Dispatcher:
         args: Tuple[Any, ...],
         kwargs: Dict[str, Any],
         send_stream_chunk: Callable[[Any], Coroutine[None, None, None]],
-        task_status: TaskStatus = TASK_STATUS_IGNORED,
+        task_status: TaskStatus[None] = TASK_STATUS_IGNORED,
     ) -> Any:
         """
         Calls the method.
@@ -162,7 +162,7 @@ class RPCServer:
         self.stream = stream
         self.dispatcher = Dispatcher(manager)
 
-    async def handle_request(self, request: Request, task_status: TaskStatus) -> None:
+    async def handle_request(self, request: Request, task_status: TaskStatus[None]) -> None:
         """
         Handle a request call.
         """
@@ -235,7 +235,7 @@ class RPCServer:
         async def wrap_task(
             task: Callable[..., Coroutine[None, None, None]],
             *args: Any,
-            task_status: TaskStatus,
+            task_status: TaskStatus[None],
         ) -> None:
             try:
                 await task(*args, task_status=task_status)

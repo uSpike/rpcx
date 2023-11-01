@@ -17,7 +17,7 @@ async def test_bad_message():
 
     bad_msg = BadMessage(0)
 
-    stream = StapledObjectStream(*anyio.create_memory_object_stream(math.inf, item_type=bytes))
+    stream = StapledObjectStream(*anyio.create_memory_object_stream[bytes](math.inf))
     server = RPCServer(stream, RPCManager())
     with pytest.raises(ValueError, match="Unknown message type: 100"):
         async with anyio.create_task_group() as tg:
@@ -26,7 +26,7 @@ async def test_bad_message():
 
 
 async def test_internal_error(mocker):
-    stream = StapledObjectStream(*anyio.create_memory_object_stream(math.inf, item_type=bytes))
+    stream = StapledObjectStream(*anyio.create_memory_object_stream[bytes](math.inf))
     server = RPCServer(stream, RPCManager())
 
     mocker.patch.object(server, "handle_request", side_effect=Exception("boom!"))
@@ -39,7 +39,7 @@ async def test_internal_error(mocker):
 
 
 async def test_invalid_id(caplog):
-    stream = StapledObjectStream(*anyio.create_memory_object_stream(math.inf, item_type=bytes))
+    stream = StapledObjectStream(*anyio.create_memory_object_stream[bytes](math.inf))
     server = RPCServer(stream, RPCManager())
 
     msg = RequestCancel(id=1)
@@ -61,7 +61,7 @@ async def test_unhandled_message(caplog):
     rpc = RPCManager()
     rpc.register("wait", wait)
 
-    stream = StapledObjectStream(*anyio.create_memory_object_stream(math.inf, item_type=bytes))
+    stream = StapledObjectStream(*anyio.create_memory_object_stream[bytes](math.inf))
     server = RPCServer(stream, rpc)
 
     # start a task that waits forever
