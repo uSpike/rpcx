@@ -1,5 +1,8 @@
 import logging
 import math
+import sys
+from contextlib import contextmanager
+from typing import Generator
 
 import anyio
 import pytest
@@ -8,7 +11,20 @@ from anyio.streams.stapled import StapledObjectStream
 from rpcx import RPCManager, RPCServer
 from rpcx.message import Message, Request, RequestCancel, Response, ResponseStatus, message_to_bytes
 
+if sys.version_info < (3, 11):
+    from exceptiongroup import BaseExceptionGroup
+
 pytestmark = pytest.mark.anyio
+
+
+@contextmanager
+def collapse_excgroups() -> Generator[None, None, None]:
+    try:
+        yield
+    except BaseException as exc:
+        while isinstance(exc, BaseExceptionGroup) and len(exc.exceptions) == 1:
+            exc = exc.exceptions[0]
+        raise exc
 
 
 async def test_bad_message():
@@ -20,9 +36,10 @@ async def test_bad_message():
     stream = StapledObjectStream(*anyio.create_memory_object_stream[bytes](math.inf))
     server = RPCServer(stream, RPCManager())
     with pytest.raises(ValueError, match="Unknown message type: 100"):
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(server.serve, True)
-            await stream.send(message_to_bytes(bad_msg))
+        with collapse_excgroups():
+            async with anyio.create_task_group() as tg:
+                tg.start_soon(server.serve, True)
+                await stream.send(message_to_bytes(bad_msg))
 
 
 async def test_internal_error(mocker):
@@ -33,9 +50,10 @@ async def test_internal_error(mocker):
     msg = Request(id=1, method="foo", args=(), kwargs={})
 
     with pytest.raises(Exception, match="boom!"):
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(server.serve, True)
-            await stream.send(message_to_bytes(msg))
+        with collapse_excgroups():
+            async with anyio.create_task_group() as tg:
+                tg.start_soon(server.serve, True)
+                await stream.send(message_to_bytes(msg))
 
 
 async def test_invalid_id(caplog):
