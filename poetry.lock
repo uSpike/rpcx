@@ -24,13 +24,13 @@ trio = ["trio (>=0.23)"]
 
 [[package]]
 name = "asyncstdlib"
-version = "3.10.9"
+version = "3.12.0"
 description = "The missing async toolbox"
 optional = false
 python-versions = "~=3.6"
 files = [
-    {file = "asyncstdlib-3.10.9-py3-none-any.whl", hash = "sha256:2325840babe05a717ea6f03ae71a5bb7e93786e0d1df1d60aeb8069aac6746cc"},
-    {file = "asyncstdlib-3.10.9.tar.gz", hash = "sha256:c5de1bf1c60de1203a9b135058dcfea7de2507d321e56279baca0905cd8628cd"},
+    {file = "asyncstdlib-3.12.0-py3-none-any.whl", hash = "sha256:68b8dc92d91193fe977825e2dc965b74ae6624d1994bcd5958aa7414ba9d4eaa"},
+    {file = "asyncstdlib-3.12.0.tar.gz", hash = "sha256:83d620553fea73ee924a986e69135bcacb655f6cdc6f2f9e67030a1e259d8be5"},
 ]
 
 [package.extras]
