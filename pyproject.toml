@@ -25,7 +25,7 @@ websockets = "^10"
 
 [tool.poetry.dev-dependencies]
 msgpack-types = "^0.5.0"
-pytest = "^7.0"
+pytest = "^8.0.0"
 mypy = "^1.0"
 pytest-cov = "^4"
 trio = "^0.23.0"
