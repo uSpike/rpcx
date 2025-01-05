@@ -84,7 +84,7 @@ jobs:
         run: |
           poetry config virtualenvs.in-project true
           poetry install --no-interaction
-          pip install pre-commit==3.1.0
+          pip install pre-commit==4.0.1
 
       - name: Cache pre-commit hooks
         id: cache-pre-commit
