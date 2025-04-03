@@ -1,14 +1,9 @@
 import logging
 import math
-import sys
+from collections.abc import Awaitable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, AsyncIterator, Callable, Coroutine, Dict, Generator, Optional
-
-if sys.version_info >= (3, 9):  # pragma: nocover
-    from collections.abc import Awaitable
-else:  # pragma: nocover
-    from typing import Awaitable
 
 import anyio
 from anyio.abc import AnyByteStream
