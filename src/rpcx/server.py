@@ -1,8 +1,8 @@
 import inspect
 import logging
 import math
-import sys
 import traceback
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any, Callable, Coroutine, Dict, Optional, Tuple, get_type_hints
 
@@ -23,12 +23,6 @@ from .message import (
     message_from_bytes,
     message_to_bytes,
 )
-
-if sys.version_info >= (3, 9):  # pragma: nocover
-    from collections.abc import AsyncIterator
-else:  # pragma: nocover
-    from typing import AsyncIterator
-
 
 LOG = logging.getLogger(__name__)
 

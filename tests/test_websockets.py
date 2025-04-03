@@ -1,9 +1,4 @@
-import sys
-
-if sys.version_info >= (3, 8):
-    from unittest.mock import AsyncMock
-else:
-    from mock import AsyncMock
+from unittest.mock import AsyncMock
 
 import anyio
 import pytest
