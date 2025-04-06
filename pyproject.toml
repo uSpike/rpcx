@@ -39,11 +39,11 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.9"
 strict = true
 show_column_numbers = true
 show_error_codes = true
-files = "src/**.py"
+files = "src/**/*.py"
 
 [tool.black]
 line-length = 120
