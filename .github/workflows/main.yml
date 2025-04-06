@@ -44,6 +44,7 @@ jobs:
         if: steps.cache-deps.cache-hit != 'true'
         run: |
           poetry config virtualenvs.in-project true
+          poetry env use `which python${{ matrix.python-version }}`
           poetry install --no-interaction
 
       - name: Run tests
@@ -83,6 +84,7 @@ jobs:
         if: steps.cache-deps.cache-hit != 'true'
         run: |
           poetry config virtualenvs.in-project true
+          poetry env use `which python${{ matrix.python-version }}`
           poetry install --no-interaction
           pip install pre-commit==4.0.1
 
