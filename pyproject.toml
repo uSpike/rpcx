@@ -45,51 +45,16 @@ show_column_numbers = true
 show_error_codes = true
 files = "src/**/*.py"
 
-[tool.black]
+[tool.ruff]
 line-length = 120
-target-version = ['py39']
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-)/
-'''
 
-[tool.isort]
-profile = "black"
-line_length = 120
+[tool.ruff.lint]
+select = ["A", "B", "C4", "ERA", "F", "I", "PT", "S"]
+ignore = ["A002", "B9", "PT011", "PT012"]
 
-[tool.flakeheaven]
-format = "colored"
-show_source = true
-max_line_length = 120
-
-[tool.flakeheaven.plugins]
-# Ignore redefinition of variable name in new scope
-pyflakes = ["+*", "-F823"]
-flake8-bandit = ["+*"]
-flake8-bugbear = ["+*"]
-flake8-builtins = ["+*"]
-flake8-comprehensions = ["+*"]
-flake8-darglint = ["+*"]
-flake8-docstrings = ["+*"]
-flake8-eradicate = ["+*"]
-flake8-mutable = ["+*"]
-flake8-pytest-style = ["+*"]
-flake8-spellcheck = ["+*"]
-
-[tool.flakeheaven.exceptions."**/__init__.py"]
-# Ignore unused imports in __init__.py files
-pyflakes = ["-F401"]
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/**.py" = ["S101"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
