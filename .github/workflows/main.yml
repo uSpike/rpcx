@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14.0-rc.3"]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -41,10 +41,12 @@ jobs:
           key: ${{ runner.os }}-poetry-${{ env.POETRY_VERSION }}-${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version  == '3.14.0-rc.3' && '3.14' || matrix.python-version }}
         if: steps.cache-deps.cache-hit != 'true'
         run: |
           poetry config virtualenvs.in-project true
-          poetry env use `which python${{ matrix.python-version }}`
+          poetry env use `which python${{ env.PYTHON_VERSION }}`
           poetry install --no-interaction
 
       - name: Run tests
