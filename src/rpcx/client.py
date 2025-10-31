@@ -1,7 +1,7 @@
 import logging
 import math
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Coroutine, Generator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from typing import Any
 
@@ -144,25 +144,31 @@ class RPCClient:
     async def __aexit__(self, *args: Any) -> bool | None:
         return await self._ctx.__aexit__(*args)
 
+    @contextmanager
+    def _make_req_task(self, req_id: int) -> Generator[_RequestTask, None, None]:
+        task = self.tasks[req_id] = _RequestTask()
+        try:
+            with task.response_consumer, task.response_producer, task.stream_consumer, task.stream_producer:
+                yield task
+        finally:
+            del self.tasks[req_id]
+
     async def request(self, method: str, *args: Any, **kwargs: Any) -> Any:
         req = Request(id=self.next_msg_id, method=method, args=args, kwargs=kwargs)
         await self.send_msg(req)
-        task = self.tasks[req.id] = _RequestTask()
 
-        try:
-            return await task.get_response()
-        except anyio.get_cancelled_exc_class():
-            with anyio.CancelScope(shield=True):
-                await self.send_msg(RequestCancel(req.id))
-            raise
-        finally:
-            del self.tasks[req.id]
+        with self._make_req_task(req.id) as task:
+            try:
+                return await task.get_response()
+            except anyio.get_cancelled_exc_class():
+                with anyio.CancelScope(shield=True):
+                    await self.send_msg(RequestCancel(req.id))
+                raise
 
     @asynccontextmanager
     async def request_stream(self, method: str, *args: Any, **kwargs: Any) -> AsyncGenerator[RequestStream, None]:
         req = Request(id=self.next_msg_id, method=method, args=args, kwargs=kwargs)
         await self.send_msg(req)
-        task = self.tasks[req.id] = _RequestTask()
 
         did_send_chunk = False
 
@@ -171,25 +177,21 @@ class RPCClient:
             did_send_chunk = True
             await self.send_msg(RequestStreamChunk(req.id, value))
 
-        stream = RequestStream(
-            _get_response=task.get_response,
-            _stream_consumer=task.stream_consumer,
-            send=send_stream_chunk,
-        )
-
-        try:
-            with task.stream_producer, task.stream_consumer:
-                yield stream
+        with self._make_req_task(req.id) as task:
+            try:
+                yield RequestStream(
+                    _get_response=task.get_response,
+                    _stream_consumer=task.stream_consumer,
+                    send=send_stream_chunk,
+                )
                 if did_send_chunk:
                     # Sent a stream chunk, must send the stream end
                     await self.send_msg(RequestStreamEnd(req.id))
                 await task.get_response()
-        except anyio.get_cancelled_exc_class():
-            with anyio.CancelScope(shield=True):
-                await self.send_msg(RequestCancel(req.id))
-            raise
-        finally:
-            del self.tasks[req.id]
+            except anyio.get_cancelled_exc_class():
+                with anyio.CancelScope(shield=True):
+                    await self.send_msg(RequestCancel(req.id))
+                raise
 
     async def receive_loop(self) -> None:
         """
