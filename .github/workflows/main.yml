@@ -48,7 +48,7 @@ jobs:
           poetry install --no-interaction
 
       - name: Run tests
-        run: poetry run pytest -v -Walways
+        run: poetry run pytest -v
   lint:
     strategy:
       fail-fast: false

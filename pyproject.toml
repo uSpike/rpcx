@@ -59,3 +59,4 @@ ignore = ["A002", "B9", "PT011", "PT012"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=src --cov-report=term-missing --no-cov-on-fail --cov-fail-under=100"
+filterwarnings = ["always"]
