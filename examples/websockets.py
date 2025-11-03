@@ -3,12 +3,14 @@ Utilities for websockets
 """
 
 from dataclasses import dataclass
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import anyio
 from anyio.abc import ObjectStream
-from websockets.client import WebSocketClientProtocol
 from websockets.exceptions import ConnectionClosed
+
+if TYPE_CHECKING:
+    from websockets.legacy.client import WebSocketClientProtocol
 
 
 @dataclass
@@ -17,7 +19,7 @@ class WebSocketsStream(ObjectStream[bytes]):
     Wrapper for WebSocketClientProtocol to appear as an anyio ObjectStream.
     """
 
-    websocket: WebSocketClientProtocol
+    websocket: "WebSocketClientProtocol"
 
     async def receive(self) -> bytes:
         try:

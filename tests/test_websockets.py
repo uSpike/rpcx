@@ -1,3 +1,7 @@
+import sys
+
+sys.path.extend("../examples")
+
 from unittest.mock import AsyncMock
 
 import anyio
@@ -5,7 +9,7 @@ import pytest
 from websockets.exceptions import ConnectionClosed
 from websockets.frames import Close
 
-from rpcx.websockets import WebSocketsStream
+from examples.websockets import WebSocketsStream
 
 pytestmark = pytest.mark.anyio
 
