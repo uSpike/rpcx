@@ -3,7 +3,7 @@ import math
 from collections.abc import Awaitable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Callable, Coroutine, Dict, Generator, Optional
+from typing import Any, AsyncGenerator, AsyncIterator, Callable, Coroutine, Dict, Generator, Optional
 
 import anyio
 from anyio.abc import AnyByteStream
@@ -128,7 +128,7 @@ class RPCClient:
         return self._next_id
 
     @asynccontextmanager
-    async def _make_ctx(self) -> AsyncIterator["RPCClient"]:
+    async def _make_ctx(self) -> AsyncGenerator["RPCClient", None]:
         try:
             async with anyio.create_task_group() as task_group:
                 task_group.start_soon(self.receive_loop)
@@ -159,7 +159,7 @@ class RPCClient:
             del self.tasks[req.id]
 
     @asynccontextmanager
-    async def request_stream(self, method: str, *args: Any, **kwargs: Any) -> AsyncIterator[RequestStream]:
+    async def request_stream(self, method: str, *args: Any, **kwargs: Any) -> AsyncGenerator[RequestStream, None]:
         req = Request(id=self.next_msg_id, method=method, args=args, kwargs=kwargs)
         await self.send_msg(req)
         task = self.tasks[req.id] = _RequestTask()
