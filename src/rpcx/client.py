@@ -120,6 +120,8 @@ class RPCClient:
         # We don't want this to be huge so the message size stays small
         self._max_id = 2**16 - 1
         self._timeout = 10
+        self._closed = False
+        self._start_receive = anyio.Event()
 
     @property
     def next_msg_id(self) -> int:
@@ -159,8 +161,12 @@ class RPCClient:
             del self.tasks[req_id]
 
     async def request(self, method: str, *args: Any, **kwargs: Any) -> Any:
+        if self._closed:
+            raise RuntimeError(f"Cannot request {method}, server stream is closed")
+
         req = Request(id=self.next_msg_id, method=method, args=args, kwargs=kwargs)
         await self.send_msg(req)
+        self._start_receive.set()
 
         with self._make_req_task(req.id) as task:
             try:
@@ -172,8 +178,12 @@ class RPCClient:
 
     @asynccontextmanager
     async def request_stream(self, method: str, *args: Any, **kwargs: Any) -> AsyncGenerator[RequestStream, None]:
+        if self._closed:
+            raise RuntimeError(f"Cannot request {method}, server stream is closed")
+
         req = Request(id=self.next_msg_id, method=method, args=args, kwargs=kwargs)
         await self.send_msg(req)
+        self._start_receive.set()
 
         did_send_chunk = False
 
@@ -204,6 +214,9 @@ class RPCClient:
         """
 
         try:
+            # Process incoming data once a request has been started
+            await self._start_receive.wait()
+
             async for data in self.stream:
                 msg = message_from_bytes(data)
                 task = self.tasks.get(msg.id)
@@ -228,6 +241,7 @@ class RPCClient:
                         else:
                             LOG.exception("Client receive error: %s", msg)
         finally:
+            self._closed = True
             # Ensure any remaining requests do not hang, raises EndOfStream exception within remaining requests
             for task in self.tasks.values():
                 task.force_abort_streams()
