@@ -24,7 +24,7 @@ class WebSocketsStream(ObjectStream[bytes]):
     async def receive(self) -> bytes:
         try:
             # assume we're always receiving binary frames
-            return cast(bytes, await self.websocket.recv())
+            return cast("bytes", await self.websocket.recv())
         except ConnectionClosed as exc:
             raise anyio.EndOfStream() from exc
 

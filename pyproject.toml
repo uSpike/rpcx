@@ -49,7 +49,7 @@ files = "src/**/*.py"
 line-length = 120
 
 [tool.ruff.lint]
-select = ["A", "B", "C4", "ERA", "F", "I", "PT", "S"]
+select = ["A", "B", "C4", "ERA", "F", "I", "PT", "S", "TC", "UP"]
 ignore = ["A002", "B9", "PT011", "PT012"]
 
 [tool.ruff.lint.per-file-ignores]
