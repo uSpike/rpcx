@@ -2,9 +2,9 @@ import inspect
 import logging
 import math
 import traceback
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass, field
-from typing import Any, Callable, Coroutine, Dict, Optional, Tuple, get_type_hints
+from typing import Any, get_type_hints
 
 import anyio
 from anyio import TASK_STATUS_IGNORED
@@ -37,7 +37,7 @@ class RPCMethod:
         return inspect.signature(self.func)
 
     @property
-    def stream_arg(self) -> Optional[str]:
+    def stream_arg(self) -> str | None:
         hints = get_type_hints(self.func)
         for name in self.signature.parameters:
             if hints.get(name) is Stream:
@@ -47,7 +47,7 @@ class RPCMethod:
 
 class RPCManager:
     def __init__(self) -> None:
-        self.methods: Dict[str, RPCMethod] = {}
+        self.methods: dict[str, RPCMethod] = {}
 
     def register(self, method_name: str, func: Callable[..., Any]) -> None:
         """
@@ -91,13 +91,13 @@ class Stream(AsyncIterator["Stream"]):
 class Task:
     def __init__(self) -> None:
         self.cancel_scope = anyio.CancelScope()
-        self.stream: Optional[Stream] = None
+        self.stream: Stream | None = None
 
 
 @dataclass
 class Dispatcher:
     manager: RPCManager
-    tasks: Dict[int, Task] = field(default_factory=dict)
+    tasks: dict[int, Task] = field(default_factory=dict)
 
     async def aclose(self) -> None:
         for task in self.tasks.values():
@@ -110,8 +110,8 @@ class Dispatcher:
         self,
         request_id: int,
         method_name: str,
-        args: Tuple[Any, ...],
-        kwargs: Dict[str, Any],
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
         send_stream_chunk: Callable[[Any], Coroutine[None, None, None]],
         task_status: TaskStatus[None] = TASK_STATUS_IGNORED,
     ) -> Any:

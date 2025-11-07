@@ -1,5 +1,5 @@
 import enum
-from typing import Any, ClassVar, Dict, Tuple
+from typing import Any, ClassVar
 
 from msgpack import packb, unpackb
 
@@ -59,7 +59,7 @@ class Message:
     def __init__(self, id: int) -> None:
         self.id = id
 
-    def astuple(self) -> Tuple[Any, ...]:
+    def astuple(self) -> tuple[Any, ...]:
         attr_names = ("type",) + self.__slots__
         return tuple(getattr(self, attr) for attr in attr_names)
 
@@ -86,7 +86,7 @@ class Request(Message):
 
     __slots__ = ("id", "method", "args", "kwargs")
 
-    def __init__(self, id: int, method: str, args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> None:
+    def __init__(self, id: int, method: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> None:
         super().__init__(id)
         self.method = method
         self.args = args

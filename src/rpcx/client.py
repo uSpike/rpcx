@@ -1,9 +1,9 @@
 import logging
 import math
-from collections.abc import Awaitable
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Coroutine, Generator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, AsyncIterator, Callable, Coroutine, Dict, Generator, Optional
+from typing import Any
 
 import anyio
 from anyio.abc import AnyByteStream
@@ -109,7 +109,7 @@ class RPCClient:
         self.stream = stream
         self.raise_on_error = raise_on_error
         #: In-flight requests, key is request id
-        self.tasks: Dict[int, _RequestTask] = {}
+        self.tasks: dict[int, _RequestTask] = {}
         self._next_id = 0
         # This represents the maximum number of concurrent requests
         # We don't want this to be huge so the message size stays small
@@ -141,7 +141,7 @@ class RPCClient:
         self._ctx = self._make_ctx()
         return await self._ctx.__aenter__()
 
-    async def __aexit__(self, *args: Any) -> Optional[bool]:
+    async def __aexit__(self, *args: Any) -> bool | None:
         return await self._ctx.__aexit__(*args)
 
     async def request(self, method: str, *args: Any, **kwargs: Any) -> Any:
