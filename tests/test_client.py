@@ -220,3 +220,36 @@ async def test_request_stream_server_stream_end(test_client):
             tg.start_soon(test_client.client.receive_loop)
             await anyio.wait_all_tasks_blocked()
             await test_client.server_stream.send_stream.aclose()
+
+
+async def test_request_after_server_close(test_client):
+    msg = Response(id=1, status=ResponseStatus.OK, value=1)
+    with anyio.fail_after(1):
+        await test_client.server_stream.send(message_to_bytes(msg))
+        async with test_client.client as client:
+            # Valid response
+            val = await client.request("any")
+            assert val == msg.value
+            await test_client.server_stream.send_stream.aclose()
+            await anyio.wait_all_tasks_blocked()
+            # Server closed
+            with pytest.raises(RuntimeError):
+                # Server closes before request
+                await client.request("any")
+
+
+async def test_request_stream_after_server_close(test_client):
+    msg = Response(id=1, status=ResponseStatus.OK, value=1)
+    with anyio.fail_after(1):
+        await test_client.server_stream.send(message_to_bytes(msg))
+        async with test_client.client as client:
+            # Valid response
+            val = await client.request("any")
+            assert val == msg.value
+            await test_client.server_stream.send_stream.aclose()
+            await anyio.wait_all_tasks_blocked()
+            # Server closed
+            with pytest.raises(RuntimeError):
+                # Server closes before request
+                async with client.request_stream("any"):
+                    ...
