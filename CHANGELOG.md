@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+* Drop support for Python 3.8 and 3.9
+* Drop `websockets` dependency
+* Make the `websockets` module an example
+* Fix typing of AsyncGenerators
+
 ## [0.3.0] - 2023-11-1
 
 * Bump supported version of `anyio` to 4.x
