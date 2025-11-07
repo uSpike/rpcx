@@ -148,8 +148,12 @@ async def test_receive_unhandled_message(test_client, caplog):
 async def test_raise_on_error(test_client):
     client = test_client.client
 
+    async def request_ended() -> None:
+        with pytest.raises(anyio.EndOfStream):
+            await client.request("any")
+
     async with anyio.create_task_group() as task_group:
-        task_group.start_soon(client.request, "any")
+        task_group.start_soon(request_ended)
         await anyio.wait_all_tasks_blocked()
 
         client.tasks[1].stream_producer.close()
@@ -188,3 +192,31 @@ async def test_internalerror(test_client):
     async with test_client.client as client:
         with pytest.raises(InternalError):
             await client.request("any")
+
+
+async def test_request_server_stream_end(test_client):
+    async def request_closed():
+        with pytest.raises(anyio.EndOfStream):
+            await test_client.client.request("any")
+
+    with anyio.fail_after(1):
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(request_closed)
+            tg.start_soon(test_client.client.receive_loop)
+            await anyio.wait_all_tasks_blocked()
+            await test_client.server_stream.send_stream.aclose()
+
+
+async def test_request_stream_server_stream_end(test_client):
+    async def request_stream_closed():
+        with pytest.raises(anyio.EndOfStream):
+            async with test_client.client.request_stream("any") as stream:
+                async for _ in stream:
+                    ...
+
+    with anyio.fail_after(1):
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(request_stream_closed)
+            tg.start_soon(test_client.client.receive_loop)
+            await anyio.wait_all_tasks_blocked()
+            await test_client.server_stream.send_stream.aclose()
