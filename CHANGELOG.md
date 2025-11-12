@@ -6,6 +6,7 @@
 * Drop `websockets` dependency
 * Make the `websockets` module an example
 * Fix typing of AsyncGenerators
+* Cleanup unclosed memory object streams to address anyio 4.4.0+ resource warnings
 
 ## [0.3.0] - 2023-11-1
 
