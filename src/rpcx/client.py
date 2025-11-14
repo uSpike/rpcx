@@ -80,6 +80,10 @@ class _RequestTask:
             else:
                 raise RemoteError(response.value)
 
+    def close(self) -> None:
+        self.response_producer.close()
+        self.stream_producer.close()
+
 
 @dataclass(repr=False)
 class RequestStream(Awaitable[Any], AsyncIterator["RequestStream"]):
@@ -115,6 +119,8 @@ class RPCClient:
         # We don't want this to be huge so the message size stays small
         self._max_id = 2**16 - 1
         self._timeout = 10
+        self._closed = False
+        self._start_receive = anyio.Event()
 
     @property
     def next_msg_id(self) -> int:
@@ -154,8 +160,12 @@ class RPCClient:
             del self.tasks[req_id]
 
     async def request(self, method: str, *args: Any, **kwargs: Any) -> Any:
+        if self._closed:
+            raise anyio.ClosedResourceError(f"Cannot request {method}, server stream is closed")
+
         req = Request(id=self.next_msg_id, method=method, args=args, kwargs=kwargs)
         await self.send_msg(req)
+        self._start_receive.set()
 
         with self._make_req_task(req.id) as task:
             try:
@@ -167,8 +177,12 @@ class RPCClient:
 
     @asynccontextmanager
     async def request_stream(self, method: str, *args: Any, **kwargs: Any) -> AsyncGenerator[RequestStream, None]:
+        if self._closed:
+            raise anyio.ClosedResourceError(f"Cannot request {method}, server stream is closed")
+
         req = Request(id=self.next_msg_id, method=method, args=args, kwargs=kwargs)
         await self.send_msg(req)
+        self._start_receive.set()
 
         did_send_chunk = False
 
@@ -197,29 +211,39 @@ class RPCClient:
         """
         Receives data on the websocket and runs handlers.
         """
-        async for data in self.stream:
-            msg = message_from_bytes(data)
-            task = self.tasks.get(msg.id)
 
-            # If we cancel a request, it is possible that responses could come after deleting the task.
-            # In this case, we do not care about those responses.
-            if task is not None:
-                try:
-                    if isinstance(msg, Response):
-                        await task.response_producer.send(msg)
-                    elif isinstance(msg, ResponseStreamChunk):
-                        await task.stream_producer.send(msg.value)
-                    elif isinstance(msg, ResponseStreamEnd):
-                        task.stream_producer.close()
-                    else:
-                        LOG.warning("Received unhandled message: %s", msg)
-                except anyio.get_cancelled_exc_class():  # pragma: nocover
-                    raise
-                except:
-                    if self.raise_on_error:
+        try:
+            # Process incoming data once a request has been started
+            await self._start_receive.wait()
+
+            async for data in self.stream:
+                msg = message_from_bytes(data)
+                task = self.tasks.get(msg.id)
+
+                # If we cancel a request, it is possible that responses could come after deleting the task.
+                # In this case, we do not care about those responses.
+                if task is not None:
+                    try:
+                        if isinstance(msg, Response):
+                            await task.response_producer.send(msg)
+                        elif isinstance(msg, ResponseStreamChunk):
+                            await task.stream_producer.send(msg.value)
+                        elif isinstance(msg, ResponseStreamEnd):
+                            task.stream_producer.close()
+                        else:
+                            LOG.warning("Received unhandled message: %s", msg)
+                    except anyio.get_cancelled_exc_class():  # pragma: nocover
                         raise
-                    else:
-                        LOG.exception("Client receive error: %s", msg)
+                    except:
+                        if self.raise_on_error:
+                            raise
+                        else:
+                            LOG.exception("Client receive error: %s", msg)
+        finally:
+            self._closed = True
+            # Ensure any remaining requests do not hang, raises EndOfStream exception within remaining requests
+            for task in self.tasks.values():
+                task.close()
 
     async def send_msg(self, msg: Message) -> None:
         await self.stream.send(message_to_bytes(msg))
