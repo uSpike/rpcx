@@ -422,13 +422,13 @@ files = [
 
 [[package]]
 name = "msgpack-types"
-version = "0.6.0"
+version = "0.7.0"
 description = "Type stubs for msgpack"
 optional = false
 python-versions = "<4.0,>=3.8"
 files = [
-    {file = "msgpack_types-0.6.0-py3-none-any.whl", hash = "sha256:ab2c2c494dc9ab7657ee2dacbe0dc8d3026cc1d6ca7790395f7584aa1da08d9d"},
-    {file = "msgpack_types-0.6.0.tar.gz", hash = "sha256:9c7b14ede1eb5a3a894b50f8529cd9dc075f4f40959edf98b9ebfe114e9bcf77"},
+    {file = "msgpack_types-0.7.0-py3-none-any.whl", hash = "sha256:b07de919b771a782cdfd49d4c7b6a085661b55036d616fda1c01e3ca78cce459"},
+    {file = "msgpack_types-0.7.0.tar.gz", hash = "sha256:dadd3c51a7a869c2dabf59a97bdcdca951c453f310d73d471e104366f5c4bc87"},
 ]
 
 [package.dependencies]
@@ -895,4 +895,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "e7309e073e61e805315962888b3713f19a35f9ddaa92a7bfde803c7941edb2c3"
+content-hash = "518c102c5894f132d730199ccbf5ac65979c931d53d419da267164339d7e91f0"
