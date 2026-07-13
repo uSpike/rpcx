@@ -24,7 +24,7 @@ msgpack = "^1"
 
 [tool.poetry.dev-dependencies]
 msgpack-types = "^0.6.0"
-pytest = "^8.0.0"
+pytest = "^9.0.0"
 mypy = "^1.0"
 pytest-cov = "^7.0.0"
 trio = "^0.32.0"
