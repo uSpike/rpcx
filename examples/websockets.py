@@ -10,16 +10,16 @@ from anyio.abc import ObjectStream
 from websockets.exceptions import ConnectionClosed
 
 if TYPE_CHECKING:
-    from websockets.legacy.client import WebSocketClientProtocol
+    from websockets.asyncio.client import ClientConnection
 
 
 @dataclass
 class WebSocketsStream(ObjectStream[bytes]):
     """
-    Wrapper for WebSocketClientProtocol to appear as an anyio ObjectStream.
+    Wrapper for ClientConnection to appear as an anyio ObjectStream.
     """
 
-    websocket: "WebSocketClientProtocol"
+    websocket: "ClientConnection"
 
     async def receive(self) -> bytes:
         try:
