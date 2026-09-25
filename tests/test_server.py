@@ -1,6 +1,5 @@
 import logging
 import math
-import sys
 from collections.abc import Generator
 from contextlib import contextmanager
 
@@ -10,9 +9,6 @@ from anyio.streams.stapled import StapledObjectStream
 
 from rpcx import RPCManager, RPCServer
 from rpcx.message import Message, Request, RequestCancel, Response, ResponseStatus, message_to_bytes
-
-if sys.version_info < (3, 11):
-    from exceptiongroup import BaseExceptionGroup
 
 pytestmark = pytest.mark.anyio
 
